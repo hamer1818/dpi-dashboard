@@ -44,7 +44,7 @@ function Protect-Dir([string]$path, [bool]$usersRead) {
         $reparse = [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
         $ownerOk = -not $OnWindows
         if ($OnWindows -and -not $reparse) {
-            $owner = (Get-Acl -LiteralPath $path).GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+            $owner = [System.IO.Directory]::GetAccessControl($path).GetOwner([System.Security.Principal.SecurityIdentifier]).Value
             $ownerOk = $owner -in @('S-1-5-32-544', 'S-1-5-18')
         }
         if ($reparse -or -not $ownerOk) {
@@ -68,7 +68,9 @@ function Protect-Dir([string]$path, [bool]$usersRead) {
             (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-545')), 'ReadAndExecute', $inherit, $none, $allow)))
     }
     $acl.SetOwner($admins)
-    Set-Acl -LiteralPath $path -AclObject $acl
+    # .NET instead of Set-Acl: no module to load, and it does not try to write the audit
+    # list (which needs SeSecurityPrivilege).
+    [System.IO.Directory]::SetAccessControl($path, $acl)
 }
 
 function Log([string]$s) {

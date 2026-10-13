@@ -97,3 +97,12 @@ def test_windows_log_path_uses_programdata(monkeypatch):
     monkeypatch.setitem(os.environ, "ProgramData", os.path.join("X", "PD"))
     assert runner.windows_log_path("n") == \
         runner.Path("X", "PD", "dpi-dashboard", "logs", "n.log")
+
+
+def test_elevated_windows_session_loads_only_system_modules(monkeypatch):
+    """PSModulePath is reset before any cmdlet: the user's module folder is writable."""
+    _, inner = windows_inner(monkeypatch, "tune")
+    first = inner.split("};", 1)[0]
+    assert "$env:PSModulePath =" in first and "GetFolderPath('System')" in first
+    assert "$env:" not in first.split("$env:PSModulePath =", 1)[1]   # not from env vars
+    assert inner.index("PSModulePath") < inner.index("New-Object")

@@ -105,7 +105,14 @@ def _windows_inner(params: dict[str, str]) -> str:
     packed = base64.b64encode(gzip.compress(helper_text("setup-windows.ps1").encode("utf-8"),
                                             mtime=0)).decode("ascii")
     named = " ".join(f"-{k} {_ps_quote(v)}" for k, v in params.items())
-    return ("$ErrorActionPreference = 'Stop'; "
+    # Before any cmdlet runs: PowerShell autoloads modules from PSModulePath, which
+    # includes the user's own Documents\WindowsPowerShell\Modules. An elevated session
+    # must only load the system's modules. The folders come from the OS, not from
+    # environment variables the user controls. (Windows PowerShell only; pwsh in tests.)
+    return ("if ($PSVersionTable.PSEdition -eq 'Desktop') { $env:PSModulePath = "
+            "[Environment]::GetFolderPath('ProgramFiles') + '\\WindowsPowerShell\\Modules;' + "
+            "[Environment]::GetFolderPath('System') + '\\WindowsPowerShell\\v1.0\\Modules' }; "
+            "$ErrorActionPreference = 'Stop'; "
             f"$b = [Convert]::FromBase64String('{packed}'); "
             "$z = New-Object IO.Compression.GZipStream((New-Object IO.MemoryStream(,$b)), "
             "[IO.Compression.CompressionMode]::Decompress); "
