@@ -73,9 +73,12 @@ function Protect-Dir([string]$path, [bool]$usersRead) {
     [System.IO.Directory]::SetAccessControl($path, $acl)
 }
 
+# Write-Host, not Write-Output: inside a function, Write-Output becomes part of the
+# function's return value (Get-Release would return the log lines with the path, and a
+# failed Start-Zapret would return @("start failed...", $false), which counts as true).
 function Log([string]$s) {
     if ($Log) { [System.IO.File]::AppendAllText($Log, "$s`n", (New-Object System.Text.UTF8Encoding($false))) }
-    Write-Output $s
+    Write-Host $s
 }
 function Fail([string]$s) { Log "@@ERROR $s"; Log '@@DONE fail'; exit 1 }
 

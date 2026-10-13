@@ -96,3 +96,20 @@ def run_embedded_existing(tmp_path, monkeypatch, pd):
                        env={**os.environ, "ProgramData": str(pd), "ProgramFiles": str(pf)})
     log = inv.log.read_text(encoding="utf-8-sig") if inv.log.exists() else ""
     return r, log, inv
+
+
+@needs_ps
+def test_logging_does_not_leak_into_return_values(tmp_path):
+    """A function that logs must still return only its own value."""
+    text = HELPER.read_text(encoding="utf-8")
+    log_fn = text[text.index("function Log("):text.index("function Fail(")]
+    script = tmp_path / "t.ps1"
+    script.write_text("$Log = $null\n" + log_fn +
+                      "function Get-Path { Log 'step'; return 'C:\\x' }\n"
+                      "function Start-It { Log 'start failed'; return $false }\n"
+                      "if ((Get-Path) -ne 'C:\\x') { exit 3 }\n"
+                      "if (Start-It) { exit 4 }\n"
+                      "exit 0\n", encoding="utf-8-sig")
+    r = subprocess.run([SHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
