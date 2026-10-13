@@ -69,9 +69,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - name: Install and tune
+      # --elevate auto: the same Start-Process -Verb RunAs path users go through (UAC is
+      # off on the CI machines, so it does not wait for a click).
+      - name: Install and tune (through RunAs)
+        timeout-minutes: 15
         run: |
-          python -m dpi_dashboard.setup install --elevate none --tries 1
+          python -m dpi_dashboard.setup install --elevate auto --tries 1
           if ($LASTEXITCODE -ne 0) { throw "setup failed: $LASTEXITCODE" }
       - name: Service is running and starts automatically
         run: |
@@ -98,7 +101,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "tune failed: $LASTEXITCODE" }
       - name: Uninstall
         run: |
-          python -m dpi_dashboard.setup uninstall --elevate none
+          python -m dpi_dashboard.setup uninstall --elevate auto
           if ($LASTEXITCODE -ne 0) { throw "uninstall failed: $LASTEXITCODE" }
           if (Get-Service zapret -ErrorAction SilentlyContinue) { throw 'service still exists' }
           if (Test-Path "$env:ProgramFiles\zapret") { throw 'folder still exists' }

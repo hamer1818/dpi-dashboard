@@ -32,7 +32,8 @@ def test_dns_unknown_when_doh_fails(monkeypatch):
 
     def boom(req, timeout=None):
         raise OSError("blocked")
-    assert status.check_dns("x", opener=boom).state == "unknown"
+    d = status.check_dns("x", opener=boom)
+    assert d.state == "unknown" and "unreachable" in d.error and "blocked" in d.error
 
 
 def test_install_and_tune_rules():

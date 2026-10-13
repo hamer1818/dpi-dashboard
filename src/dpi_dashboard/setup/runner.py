@@ -93,7 +93,13 @@ def build_command(helper: Path, mode: str, log: Path, *, source: Path | None = N
                   "-File", str(helper), *args]
         if elevate == "none":
             return direct
-        inner = "& " + " ".join(_ps_quote(a) for a in [str(helper), *args]) + "; exit $LASTEXITCODE"
+        # Parameter names must stay bare: PowerShell binds a quoted '-Mode' as a plain string.
+        named = " ".join(f"{args[i]} {_ps_quote(args[i + 1])}" for i in range(0, len(args), 2))
+        # The elevated process has no console the app can read, so anything that fails
+        # before the helper starts logging is written to the log here.
+        inner = (f"try {{ & {_ps_quote(str(helper))} {named}; exit $LASTEXITCODE }} "
+                 f"catch {{ [IO.File]::AppendAllText({_ps_quote(str(log))}, "
+                 "\"@@ERROR $($_.Exception.Message)`n@@DONE fail`n\"); exit 1 }")
         enc = base64.b64encode(inner.encode("utf-16-le")).decode("ascii")
         outer = ("try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru "
                  "-WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive',"

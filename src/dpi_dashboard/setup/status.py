@@ -31,6 +31,7 @@ class DnsCheck:
     state: str = "unknown"            # "ok", "mismatch" or "unknown"
     system: list[str] = field(default_factory=list)
     encrypted: list[str] = field(default_factory=list)
+    error: str = ""                   # why the check could not be made
 
 
 @dataclass
@@ -67,16 +68,21 @@ def system_addresses(host: str) -> list[str]:
     return sorted({i[4][0] for i in infos})
 
 
-def encrypted_addresses(host: str, opener=urlopen, timeout: float = 6) -> list[str]:
+def _encrypted(host: str, opener=urlopen, timeout: float = 6) -> tuple[list[str], str]:
+    errors = []
     for url in DOH_ENDPOINTS:
         try:
             req = Request(url.format(quote(host)), headers={"Accept": "application/dns-json"})
             with opener(req, timeout=timeout) as r:
                 data = json.load(r)
-            return sorted({a["data"] for a in data.get("Answer", []) if a.get("type") == 1})
-        except (OSError, ValueError, KeyError):
-            continue
-    return []
+            return sorted({a["data"] for a in data.get("Answer", []) if a.get("type") == 1}), ""
+        except (OSError, ValueError, KeyError) as e:
+            errors.append(f"{url.split('/')[2]}: {getattr(e, 'reason', None) or e}")
+    return [], "; ".join(errors)
+
+
+def encrypted_addresses(host: str, opener=urlopen, timeout: float = 6) -> list[str]:
+    return _encrypted(host, opener, timeout)[0]
 
 
 def check_dns(host: str, opener=urlopen) -> DnsCheck:
@@ -85,9 +91,14 @@ def check_dns(host: str, opener=urlopen) -> DnsCheck:
     Providers that block by DNS answer with a different address. No overlap is reported
     as a mismatch; it is a strong hint, not proof (some CDNs answer differently by region).
     """
-    d = DnsCheck(host, system=system_addresses(host), encrypted=encrypted_addresses(host, opener))
+    encrypted, err = _encrypted(host, opener)
+    d = DnsCheck(host, system=system_addresses(host), encrypted=encrypted)
     if d.system and d.encrypted:
         d.state = "ok" if set(d.system) & set(d.encrypted) else "mismatch"
+    elif not d.system:
+        d.error = "system resolver returned no address"
+    else:
+        d.error = f"DNS over HTTPS unreachable ({err})" if err else "DNS over HTTPS gave no address"
     return d
 
 

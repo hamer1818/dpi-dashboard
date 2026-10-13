@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+- Windows: Setup failed right after the download without asking for administrator
+  rights or showing an error. The elevated command quoted the parameter names, so
+  PowerShell did not recognise them and the helper stopped before writing anything.
+- Errors that happen before the helper starts are now written to the setup log, and an
+  administrator step that ends silently is reported with its exit code.
+- The DNS check says why it could not be done.
+- CI now runs the Windows setup through the same RunAs path users go through.
+
 ## 0.2.0
 
 - **Setup** button for computers that have no bypass service yet:

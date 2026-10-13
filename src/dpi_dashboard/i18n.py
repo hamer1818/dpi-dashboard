@@ -88,6 +88,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_success": "Done. zapret is on and starts at boot.",
         "setup_removed": "zapret was removed.",
         "setup_failed": "Setup did not finish. See the messages above.",
+        "setup_no_output": "The administrator step ended without any message (exit code {code}). "
+                           "Please report this with your Windows/Linux version.",
     },
     "tr": {
         "title": "Engel aşma (DPI)",
@@ -169,6 +171,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_success": "Tamam. zapret açık ve açılışta başlıyor.",
         "setup_removed": "zapret kaldırıldı.",
         "setup_failed": "Kurulum tamamlanmadı. Yukarıdaki mesajlara bakın.",
+        "setup_no_output": "Yönetici adımı hiçbir mesaj vermeden bitti (çıkış kodu {code}). "
+                           "Lütfen Windows/Linux sürümünüzle birlikte bildirin.",
     },
 }
 

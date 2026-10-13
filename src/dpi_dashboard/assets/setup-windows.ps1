@@ -180,3 +180,4 @@ try {
 } catch {
     Fail $_.Exception.Message
 }
+exit 0

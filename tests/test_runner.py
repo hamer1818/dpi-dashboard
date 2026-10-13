@@ -54,6 +54,8 @@ def test_windows_command(tmp_path, monkeypatch):
     enc = cmd[-1].split("'-EncodedCommand','")[1].split("'")[0]
     inner = base64.b64decode(enc).decode("utf-16-le")
     assert "'" + str(helper).replace("'", "''") + "'" in inner   # quoted for PowerShell
-    assert "'-Mode' 'tune'" in inner
+    # Parameter names must be bare: a quoted '-Mode' is bound as a plain string.
+    assert "-Mode 'tune'" in inner and "'-Mode'" not in inner
+    assert "@@ERROR" in inner              # failures before the helper runs reach the log
     direct = runner.build_command(helper, "tune", tmp_path / "log", elevate="none")
     assert direct[direct.index("-File") + 1] == str(helper)

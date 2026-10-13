@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from html import escape
 from pathlib import Path
 
 from PyQt6.QtCore import QTimer, pyqtSignal
@@ -120,8 +121,13 @@ class SetupDialog(QDialog):
             key = {"ok": "setup_dns_ok", "mismatch": "setup_dns_mismatch"}.get(st.dns.state,
                                                                               "setup_dns_unknown")
             good = st.dns.state != "mismatch"
-            lines.append(ok(good, tr(key, host=st.dns.host)) if st.dns.state != "unknown"
-                         else f"<span style='color:{AMBER}'>?</span> {tr(key, host=st.dns.host)}")
+            if st.dns.state != "unknown":
+                lines.append(ok(good, tr(key, host=st.dns.host)))
+            else:
+                detail = f" <span style='color:gray'>({escape(st.dns.error)})</span>" \
+                    if st.dns.error else ""
+                lines.append(f"<span style='color:{AMBER}'>?</span> "
+                             f"{tr(key, host=st.dns.host)}{detail}")
         if st.dns and st.dns.state == "mismatch" and st.platform == "windows":
             lines.append(tr("setup_dns_windows_hint"))
         self.summary.setText("<br>".join(lines))
@@ -256,6 +262,8 @@ class SetupDialog(QDialog):
                                       else "setup_success"))
         elif done is None and rc in runner.CANCELLED_CODES:
             self.finish(False, self.tr("cancelled"))
+        elif done is None:
+            self.finish(False, self.tr("setup_no_output", code=str(rc)))
         else:
             self.finish(False, self.tr("setup_failed"))
 
