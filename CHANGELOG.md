@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — security
+
+- **Nothing a normal user can write is executed or trusted with administrator rights.**
+  Before, setup downloaded and verified zapret as the user and then ran the helper script
+  and zapret's install scripts as root from that user-writable folder, which another
+  program running as the user could change in between (and zapret's `sha256sum.txt` does
+  not cover its scripts). Now:
+  - the helper script is piped into `pkexec /bin/bash` (Linux) or compressed into the
+    elevated command line (Windows), never read from a file;
+  - the helper downloads zapret itself into a folder only root / administrators can
+    write, checks the GitHub SHA-256 and upstream's `sha256sum.txt` there, and refuses
+    unsafe archive paths and links;
+  - Linux progress comes back on stdout, not through a log file root wrote to without
+    checking the path. On Windows the log lives in `%ProgramData%\dpi-dashboard\logs`,
+    locked so users can read but not write; a folder planted there beforehand (wrong
+    owner, or a junction) is moved aside, never followed.
+- Release builds: GitHub Actions pinned to commit SHAs, read-only tokens except for
+  publishing, hash-locked build dependencies, `SHA256SUMS` and signed build provenance;
+  the third-party release action was replaced by the GitHub CLI. Dependabot keeps the
+  pins up to date.
+- `SECURITY.md` and a Security section in the README.
+
 ## 0.2.2
 
 - Setup works on minimal Linux installs: it no longer needs `pgrep` (missing on

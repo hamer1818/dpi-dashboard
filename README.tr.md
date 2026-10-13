@@ -115,10 +115,10 @@ mı, hangi araçlar eksik, DNS cevapları sahte görünüyor mu. Sonra şunlarda
 
 Kurulum, yönetici şifresini bir kez sorarak şunları yapar:
 
-1. Son sürümü [github.com/bol-van/zapret](https://github.com/bol-van/zapret/releases)'ten
-   indirir. Arşiv GitHub'ın yayınladığı SHA-256 özetiyle, içindeki her program da
-   upstream'in kendi `sha256sum.txt` listesiyle eşleşmek zorundadır. Eşleşmezse hiçbir şey
-   kurulmaz.
+1. Son sürümü [github.com/bol-van/zapret](https://github.com/bol-van/zapret/releases)'ten,
+   yalnızca yöneticilerin yazabildiği bir klasöre indirir. Arşiv GitHub'ın yayınladığı
+   SHA-256 özetiyle, içindeki her program da upstream'in kendi `sha256sum.txt` listesiyle
+   eşleşmek zorundadır. Eşleşmezse hiçbir şey kurulmaz. Bkz. [Güvenlik](#güvenlik).
 2. Linux: `/opt/zapret`'e kopyalar, işlemcinize uygun programları bağlar
    (`install_bin.sh`), ayar dosyasını ve `zapret.service` birimini yazar. Eksik `curl` ya
    da `nftables` paket yöneticinizle kurulur (pacman, apt, dnf, zypper).
@@ -166,6 +166,52 @@ python -m dpi_dashboard.setup install      # ya da: tune, uninstall
 
 Geçersiz değerler yok sayılır ve pencerede bildirilir. Düzenledikten sonra uygulamayı
 yeniden başlatın.
+
+## Güvenlik
+
+**Yönetici yetkisiyle ne çalışır.** Servisi açıp kapatmak `pkexec` (Linux) ya da UAC
+(Windows) üzerinden `systemctl enable|disable --now <servis>` / `Set-Service`,
+`Start-Service`, `Stop-Service` çalıştırır. Kurulum, uygulamayla gelen bir yardımcı betik
+çalıştırır. Bu betik hiçbir zaman normal bir kullanıcının değiştirebileceği bir dosyadan
+çalıştırılmaz: Linux'ta `pkexec /bin/bash`'e standart girdiyle verilir, Windows'ta
+sıkıştırılıp yönetici komutunun içine gömülür. Yardımcı zapret'i kendisi, yalnızca
+yöneticilerin yazabildiği bir klasöre indirir, doğrular (arşivin tamamı için GitHub'ın
+SHA-256'sı, ki kurulum betiklerini de kapsar; her program için upstream'in
+`sha256sum.txt`'i) ve klasörün dışına çıkan yol ya da bağlantı içeren arşivleri reddeder.
+Ancak bundan sonra bir şey kurulur.
+
+**Kabuğa ya da kayıt defterine ulaşmadan önce denetlenenler.** Stratejiler, site adları,
+servis adları ve Windows günlük adı katı kalıplara göre denetlenir.
+
+**Ağ.** Ağı dinleyen hiçbir şey yoktur, telemetri yoktur. İstekler `api.github.com` /
+`github.com` (kurulum), ayarlardaki siteler (bağlantı testi) ve `cloudflare-dns.com` ya da
+`dns.google`'a (DNS kontrolü ilk test sitesinin adını sorar) gider. İsteğe bağlı şifreli
+DNS, DNS sorgularınızı Quad9 ve Cloudflare'e gönderir.
+
+**zapret'in kendisinden gelen riskler.** zapret web trafiğinizi inceler ve değiştirir.
+Linux'ta `nfqws` yetkisiz bir kullanıcıya düşer. Windows'ta `winws`, zapret'in kendi
+kurulumlarında olduğu gibi WinDivert çekirdek sürücüsüyle LocalSystem olarak çalışır;
+`winws`'teki bir hata, web trafiğinizi gören yetkili bir süreçteki hata olur. zapret'i
+güncellemek için **Kaldır**'ı kullanıp yeniden kurun.
+
+**Neye karşı koruyamaz.** Kullanıcınızla zaten çalışan bir zararlı yazılım varsa, DPI
+Dashboard'un kendisini (ev klasörünüzde kurulu ya da İndirilenler'deki `.exe`) siz
+başlatmadan önce değiştirebilir; şifrenizle onayladığınız her şey de onun elinde olur.
+Kullanıcı başına kurulan hiçbir program bunu engelleyemez. DPI Dashboard'un engellediği,
+yönetici yetkisiyle çalışırken dosyaların değiştirilmesidir.
+
+**İndirilen dosyayı doğrulama.** Her sürümde `SHA256SUMS` ve her dosyayı onu derleyen
+GitHub iş akışına bağlayan imzalı bir derleme kanıtı vardır:
+
+```bash
+gh attestation verify dpi-dashboard-<sürüm>-windows-x64.exe --repo hamer1818/dpi-dashboard
+```
+
+Sürüm derlemeleri bağımlılıklarını özetleri sabitlenmiş listelerden kurar
+(`packaging/requirements/`), GitHub Actions commit kimlikleriyle sabitlenmiştir ve iş
+akışları son yayın adımı dışında salt okunur yetkiyle çalışır.
+
+Bir güvenlik açığı mı buldunuz? Lütfen gizli olarak bildirin, bkz. [SECURITY.md](SECURITY.md).
 
 ## Sorun giderme
 

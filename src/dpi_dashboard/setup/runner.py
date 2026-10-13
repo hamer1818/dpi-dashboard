@@ -1,22 +1,44 @@
-"""Run the privileged setup helper and follow its progress."""
+"""Start the privileged setup helper and follow its progress.
+
+Security boundary: the helper runs as root / administrator, so it must not execute or
+trust anything a normal user can write. The script is therefore never written to disk:
+
+- Linux: the script is piped into ``pkexec /bin/bash -c '<bootstrap>'``; the bootstrap
+  reads it from stdin and runs it. Progress comes back on stdout.
+- Windows: the script is gzip-compressed and embedded in the elevated PowerShell command
+  line. The helper logs to %ProgramData%\\dpi-dashboard\\logs, a folder it locks so users
+  can read but not write; the app follows that file.
+
+The helpers download and verify zapret themselves, in folders only root can write.
+"""
 
 from __future__ import annotations
 
 import base64
+import gzip
 import os
-import shutil
+import subprocess
 import sys
-import tempfile
+import time
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
+from ..backends.base import _NO_WINDOW
 from .strategies import is_safe
 
-# Helper -> app protocol, one line each, written to the log file:
-#   @@STEP <key>            @@BASELINE <ok>/<max>     @@TRY <n> <ok>/<max>|fail
-#   @@CHOSEN <n> <ok>/<max> @@WARN <key>              @@ERROR <text>     @@DONE ok|fail
+# Helper -> app protocol, one line each:
+#   @@STEP <key> [arg]     @@BASELINE <ok>/<max>   @@TRY <n> <ok>/<max>|fail
+#   @@CHOSEN <n> <ok>/<max> @@WARN <key>           @@ERROR <text>    @@DONE ok|fail
 # Any other line is free-form detail.
+
+LINUX_BOOTSTRAP = 'script=$(cat) && exec /bin/bash -c "$script" dpi-dashboard-setup "$@" </dev/null'
+# CreateProcess limits a command line to 32767 characters.
+WINDOWS_COMMAND_LIMIT = 32000
+# Exit codes that mean "the user said no" rather than "it failed".
+CANCELLED_CODES = (126, 127, 1223)
 
 
 @dataclass(frozen=True)
@@ -52,75 +74,105 @@ class LogTail:
         return lines
 
 
-def workdir() -> Path:
-    """A private (0700) directory for the download, the helper copy and the log."""
-    return Path(tempfile.mkdtemp(prefix="dpi-dashboard-setup-"))
+@dataclass(frozen=True)
+class Invocation:
+    args: list[str]
+    stdin: bytes | None = None     # Linux: the helper script
+    log: Path | None = None        # Windows: the file the elevated helper writes to
 
 
-def stage_helper(dest: Path) -> Path:
-    """Copy the helper script out of the package into the private work directory."""
-    name = "setup-windows.ps1" if sys.platform == "win32" else "setup-linux.sh"
-    target = dest / name
-    shutil.copyfile(files("dpi_dashboard") / "assets" / name, target)
-    return target
+def helper_text(name: str) -> str:
+    return (files("dpi_dashboard") / "assets" / name).read_text(encoding="utf-8")
 
 
-def write_strategies(dest: Path, strategies: list[str]) -> Path:
+def valid_strategies(strategies) -> list[str]:
     safe = [s.strip() for s in strategies if is_safe(s.strip())]
     if not safe:
         raise ValueError("no valid strategies")
-    path = dest / "strategies.txt"
-    path.write_text("\n".join(safe) + "\n", encoding="utf-8")
-    return path
+    return safe
+
+
+def windows_log_path(name: str) -> Path:
+    base = os.environ.get("ProgramData") or r"C:\ProgramData"
+    return Path(base) / "dpi-dashboard" / "logs" / f"{name}.log"
 
 
 def _ps_quote(s: str) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
-def build_command(helper: Path, mode: str, log: Path, *, source: Path | None = None,
-                  strategies: Path | None = None, hosts: list[str] = (), tries: int = 3,
-                  dns_dot: bool = False, elevate: str = "auto") -> list[str]:
+def _windows_inner(params: dict[str, str]) -> str:
+    packed = base64.b64encode(gzip.compress(helper_text("setup-windows.ps1").encode("utf-8"),
+                                            mtime=0)).decode("ascii")
+    named = " ".join(f"-{k} {_ps_quote(v)}" for k, v in params.items())
+    return ("$ErrorActionPreference = 'Stop'; "
+            f"$b = [Convert]::FromBase64String('{packed}'); "
+            "$z = New-Object IO.Compression.GZipStream((New-Object IO.MemoryStream(,$b)), "
+            "[IO.Compression.CompressionMode]::Decompress); "
+            "$code = (New-Object IO.StreamReader($z, [Text.Encoding]::UTF8)).ReadToEnd(); "
+            f"& ([ScriptBlock]::Create($code)) {named}; exit $LASTEXITCODE")
+
+
+def _encode(script: str) -> str:
+    return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+
+
+def build(mode: str, *, strategies=(), hosts=(), tries: int = 3, dns_dot: bool = False,
+          elevate: str = "auto", log_name: str | None = None) -> Invocation:
     """elevate: "auto" (pkexec / UAC), "sudo" (Linux terminal) or "none" (already admin)."""
+    strategies = valid_strategies(strategies) if mode != "uninstall" else []
     if sys.platform == "win32":
-        args = ["-Mode", mode, "-Log", str(log), "-Tries", str(tries),
-                "-Hosts", ",".join(hosts)]
-        if source:
-            args += ["-Source", str(source)]
-        if strategies:
-            args += ["-Strategies", str(strategies)]
-        direct = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                  "-File", str(helper), *args]
+        name = log_name or uuid.uuid4().hex
+        enc = _encode(_windows_inner({"Mode": mode, "LogName": name,
+                                      "Hosts": ",".join(hosts), "Tries": str(tries),
+                                      "Strategies": "|".join(strategies)}))
         if elevate == "none":
-            return direct
-        # Parameter names must stay bare: PowerShell binds a quoted '-Mode' as a plain string.
-        named = " ".join(f"{args[i]} {_ps_quote(args[i + 1])}" for i in range(0, len(args), 2))
-        # The elevated process has no console the app can read, so anything that fails
-        # before the helper starts logging is written to the log here.
-        inner = (f"try {{ & {_ps_quote(str(helper))} {named}; exit $LASTEXITCODE }} "
-                 f"catch {{ [IO.File]::AppendAllText({_ps_quote(str(log))}, "
-                 "\"@@ERROR $($_.Exception.Message)`n@@DONE fail`n\"); exit 1 }")
-        enc = base64.b64encode(inner.encode("utf-16-le")).decode("ascii")
-        outer = ("try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru "
-                 "-WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive',"
-                 f"'-ExecutionPolicy','Bypass','-EncodedCommand','{enc}'; exit $p.ExitCode }}"
-                 " catch { exit 1223 }")
-        return ["powershell", "-NoProfile", "-NonInteractive", "-Command", outer]
+            args = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                    "-EncodedCommand", enc]
+        else:
+            outer = ("try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru "
+                     "-WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive',"
+                     f"'-ExecutionPolicy','Bypass','-EncodedCommand','{enc}'; exit $p.ExitCode }}"
+                     " catch { exit 1223 }")
+            args = ["powershell", "-NoProfile", "-NonInteractive", "-Command", outer]
+        if len(subprocess.list2cmdline(args)) > WINDOWS_COMMAND_LIMIT:
+            raise ValueError("setup command is too long for Windows")
+        return Invocation(args, log=windows_log_path(name))
 
-    cmd = ["/bin/bash", str(helper), mode, str(log), "--tries", str(tries),
-           "--hosts", " ".join(hosts)]
-    if source:
-        cmd += ["--source", str(source)]
-    if strategies:
-        cmd += ["--strategies", str(strategies)]
+    helper_args = [mode, "--tries", str(tries), "--hosts", " ".join(hosts)]
+    for s in strategies:
+        helper_args += ["--strategy", s]
     if dns_dot:
-        cmd.append("--dns-dot")
+        helper_args.append("--dns-dot")
+    cmd = ["/bin/bash", "-c", LINUX_BOOTSTRAP, "dpi-dashboard-bootstrap", *helper_args]
     if elevate == "auto" and os.geteuid() != 0:
-        return ["pkexec", *cmd]
-    if elevate == "sudo":
-        return ["sudo", *cmd]
-    return cmd
+        cmd = ["pkexec", *cmd]
+    elif elevate == "sudo":
+        cmd = ["sudo", *cmd]
+    return Invocation(cmd, stdin=helper_text("setup-linux.sh").encode("utf-8"))
 
 
-# Exit codes that mean "the user said no" rather than "it failed".
-CANCELLED_CODES = (126, 127, 1223)
+def run(inv: Invocation, on_line: Callable[[str], None], poll: float = 0.3) -> int:
+    """Run the helper, calling on_line for every line of progress. Blocks until it ends."""
+    if inv.log is None:
+        p = subprocess.Popen(inv.args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, creationflags=_NO_WINDOW)
+        assert p.stdin and p.stdout
+        p.stdin.write(inv.stdin or b"")
+        p.stdin.close()
+        for raw in p.stdout:
+            on_line(raw.decode("utf-8", "replace").rstrip("\r\n"))
+        return p.wait()
+
+    tail = LogTail(inv.log)
+    p = subprocess.Popen(inv.args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, creationflags=_NO_WINDOW)
+    while p.poll() is None:
+        for line in tail.read():
+            on_line(line)
+        time.sleep(poll)
+    for line in tail.read():
+        on_line(line)
+    if tail.buf:
+        on_line(tail.buf)
+    return p.returncode

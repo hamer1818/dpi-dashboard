@@ -127,9 +127,10 @@ offers one of:
 Installing does this, asking for the administrator password once:
 
 1. Downloads the latest release from
-   [github.com/bol-van/zapret](https://github.com/bol-van/zapret/releases). The archive
-   must match the SHA-256 checksum published by GitHub, and every program inside it must
-   match upstream's own `sha256sum.txt`. Otherwise nothing is installed.
+   [github.com/bol-van/zapret](https://github.com/bol-van/zapret/releases), in a folder
+   only administrators can write. The archive must match the SHA-256 checksum published
+   by GitHub, and every program inside it must match upstream's own `sha256sum.txt`.
+   Otherwise nothing is installed. See [Security](#security).
 2. Linux: copies it to `/opt/zapret`, links the programs for your processor
    (`install_bin.sh`), writes the config and the `zapret.service` unit. Missing `curl` or
    `nftables` are installed with your package manager (pacman, apt, dnf, zypper).
@@ -204,6 +205,51 @@ Invalid values are ignored and reported in the window. Restart the app after edi
   reachable. It uses only the Python standard library, so it works the same on every
   system.
 
+## Security
+
+**What runs with administrator rights.** Turning the service on or off runs
+`systemctl enable|disable --now <service>` through `pkexec` (Linux) or `Set-Service` /
+`Start-Service` / `Stop-Service` through UAC (Windows). Setup runs a helper script that
+ships with the app. That script is never run from a file a normal user can change: on
+Linux it is piped into `pkexec /bin/bash`, on Windows it is compressed into the elevated
+command line. The helper downloads zapret itself, into a folder only administrators can
+write, checks it (GitHub's SHA-256 for the whole archive, which also covers the install
+scripts; upstream's `sha256sum.txt` for every program) and refuses archives with paths or
+links that leave the folder. Only then is anything installed.
+
+**What is checked before it reaches a shell or the registry.** Strategies, host names,
+service names and the Windows log name are validated against strict patterns.
+
+**Network.** Nothing listens on the network and there is no telemetry. Requests go to
+`api.github.com` / `github.com` (setup), the sites in your settings (connection test) and
+`cloudflare-dns.com` or `dns.google` (the DNS check asks them for the first test site).
+The optional encrypted DNS sends your DNS queries to Quad9 and Cloudflare.
+
+**Risks that come with zapret itself.** zapret inspects and rewrites your web traffic.
+On Linux, `nfqws` drops to an unprivileged user. On Windows, `winws` runs as LocalSystem
+with the WinDivert kernel driver, as it does with zapret's own installers; a flaw in
+`winws` would be a flaw in a privileged process that sees your web traffic. To update
+zapret, use **Remove** and install again.
+
+**What it cannot protect against.** If malware already runs as your user, it can change
+DPI Dashboard itself (installed in your home folder, or the `.exe` in Downloads) before
+you start it, and anything you then authorise with your password is in its hands. No
+program installed per user can prevent that. What DPI Dashboard does prevent is files
+being swapped while it is running with administrator rights.
+
+**Checking a download.** Every release lists `SHA256SUMS` and has a signed build
+provenance that ties each file to the GitHub workflow that built it:
+
+```bash
+gh attestation verify dpi-dashboard-<version>-windows-x64.exe --repo hamer1818/dpi-dashboard
+```
+
+Release builds install their dependencies from hash-locked lists
+(`packaging/requirements/`), GitHub Actions are pinned to commit SHAs, and workflows run
+with read-only tokens except for the final publishing step.
+
+Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
 ## Troubleshooting
 
 **"NOT FOUND".** The service is not installed, or it has another name. Check with
@@ -258,8 +304,9 @@ pyinstaller --onefile --windowed --name dpi-dashboard --icon src/dpi_dashboard/a
 
 New backends live in `src/dpi_dashboard/backends/`: implement `state()` and
 `set_enabled()` from `Backend` and register the class in `KINDS`. The setup helpers are
-`src/dpi_dashboard/assets/setup-linux.sh` and `setup-windows.ps1`; they talk to the app
-through `@@` lines in a log file (see `setup/runner.py`). The
+`src/dpi_dashboard/assets/setup-linux.sh` and `setup-windows.ps1`; they report to the app
+with `@@` lines on stdout (Linux) or in a protected log file (Windows), see
+`setup/runner.py`, which also documents the security boundary. The
 [Setup integration](.github/workflows/setup-integration.yml) workflow runs a real install,
 retune and removal on fresh Ubuntu and Windows machines.
 

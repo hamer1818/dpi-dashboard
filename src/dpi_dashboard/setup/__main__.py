@@ -11,11 +11,10 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
-import subprocess
 import sys
 
 from .. import config
-from . import runner, status, upstream
+from . import runner, status
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,28 +33,18 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(dataclasses.asdict(st), indent=2))
         return 0
 
-    work = runner.workdir()
-    log = work / "setup.log"
-    log.touch()
-    source = None
-    if a.mode == "install":
-        archive = "zip" if sys.platform == "win32" else "tar.gz"
-        try:
-            _, source = upstream.prepare(work, archive, log=print)
-        except (upstream.SetupError, OSError) as e:
-            print(f"download failed: {e}", file=sys.stderr)
-            return 1
-    cmd = runner.build_command(
-        runner.stage_helper(work), a.mode, log, source=source,
-        strategies=runner.write_strategies(work, cfg.strategies) if a.mode != "uninstall" else None,
-        hosts=cfg.hosts, tries=a.tries or cfg.tries, dns_dot=a.dns_dot, elevate=a.elevate)
-    # The helper also prints to stdout, except when elevated through UAC; read the log then.
-    rc = subprocess.call(cmd)
-    if sys.platform == "win32" and a.elevate != "none":
-        print(log.read_text(encoding="utf-8", errors="replace"))
-    done = [runner.parse_line(x) for x in log.read_text(encoding="utf-8").splitlines()]
-    ok = any(e.kind == "done" and e.args[:1] == ("ok",) for e in done)
-    return 0 if ok and rc == 0 else (rc or 1)
+    inv = runner.build(a.mode, strategies=cfg.strategies, hosts=cfg.hosts,
+                       tries=a.tries or cfg.tries, dns_dot=a.dns_dot, elevate=a.elevate)
+    done = []
+
+    def show(line: str) -> None:
+        print(line, flush=True)
+        ev = runner.parse_line(line)
+        if ev.kind == "done":
+            done.append(ev.args[:1] == ("ok",))
+
+    rc = runner.run(inv, show)
+    return 0 if done and done[-1] and rc == 0 else (rc or 1)
 
 
 if __name__ == "__main__":

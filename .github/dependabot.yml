@@ -1,0 +1,16 @@
+# Keeps the pinned GitHub Actions (commit SHAs) and the hash-locked build
+# requirements up to date through reviewable pull requests.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /packaging/requirements
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly

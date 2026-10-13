@@ -55,11 +55,13 @@ def test_managed_install_can_be_removed(app):
 
 def test_progress_rendering(app):
     d = dialog()
-    for line in ["@@STEP copy", "@@BASELINE 0/15", "@@STEP try 1", "@@TRY 1 fail",
+    for line in ["@@STEP download", "@@STEP verified v72.13", "@@STEP copy",
+                 "@@BASELINE 0/15", "@@STEP try 1", "@@TRY 1 fail",
                  "@@TRY 2 15/15", "@@CHOSEN 2 15/15", "detail line", "@@DONE ok"]:
         d.render(runner.parse_line(line))
     text = d.log.toPlainText()
-    for expected in ["Copying files", "Without zapret: 0/15", "Setting 1: zapret did not start",
+    for expected in ["Downloading zapret", "zapret v72.13: checksums verified", "Copying files",
+                     "Without zapret: 0/15", "Setting 1: zapret did not start",
                      "Setting 2: 15/15", "Chosen: setting 2 (15/15)", "detail line"]:
         assert expected in text
     assert d.done_event == runner.Event("done", ("ok",))
@@ -67,7 +69,7 @@ def test_progress_rendering(app):
 
 def test_cancelled_password_prompt(app):
     d = dialog()
-    d.mode, d.done_event, d.tail = "install", None, None
+    d.mode, d.done_event = "install", None
     d.helper_finished(126)
     assert "Cancelled" in d.log.toPlainText() and not d.result_ok
 

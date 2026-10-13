@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from html import escape
-from pathlib import Path
 
-from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -22,9 +20,8 @@ from PyQt6.QtWidgets import (
 )
 
 from . import config
-from .backends.base import _NO_WINDOW
 from .i18n import Translator
-from .setup import runner, status, upstream
+from .setup import runner, status
 
 GREEN, RED, AMBER = "#2e9e44", "#d23c3c", "#d08a00"
 
@@ -37,12 +34,12 @@ def ok(good: bool, text: str) -> str:
 
 class SetupDialog(QDialog):
     changed = pyqtSignal()          # something was installed, retuned or removed
+    line = pyqtSignal(str)          # one line of helper output, from the worker thread
 
     def __init__(self, cfg: config.Config, tr: Translator, parent=None, start_worker=None):
         super().__init__(parent)
         self.cfg, self.tr = cfg, tr
         self.status: status.SetupStatus | None = None
-        self.tail: runner.LogTail | None = None
         self.done_event: runner.Event | None = None
         self.mode: str | None = None
         self.result_ok = False
@@ -90,8 +87,7 @@ class SetupDialog(QDialog):
         lay.addWidget(self.bar)
         lay.addWidget(self.log)
 
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.poll_log)
+        self.line.connect(self.on_line)
         self.recheck()
 
     # --- status ------------------------------------------------------------------------
@@ -169,72 +165,44 @@ class SetupDialog(QDialog):
         if not self.confirm("setup_confirm_install" if mode == "install" else "setup_confirm_tune"):
             return
         self.begin()
-        work = runner.workdir()
-        if mode == "install":
-            self.say(self.tr("step_download"))
-            archive = "zip" if sys.platform == "win32" else "tar.gz"
-
-            def prep():
-                try:
-                    return upstream.prepare(work, archive)
-                except (upstream.SetupError, OSError, ValueError) as e:
-                    return e
-            self.start_worker(prep, lambda r: self.after_prepare(r, work))
-        else:
-            self.run_helper(work, "tune", None)
-
-    def after_prepare(self, result, work: Path):
-        if isinstance(result, Exception):
-            self.finish(False, self.tr("setup_download_failed", msg=str(result)))
-            return
-        rel, source = result
-        self.say(self.tr("step_verified", version=rel.version))
-        self.run_helper(work, "install", source)
+        self.run_helper(mode)
 
     def on_remove(self):
         if not self.confirm("setup_confirm_remove"):
             return
         self.begin()
-        self.run_helper(runner.workdir(), "uninstall", None)
+        self.run_helper("uninstall")
 
-    def run_helper(self, work: Path, mode: str, source: Path | None):
-        log = work / "setup.log"
-        log.touch()
+    def run_helper(self, mode: str):
+        self.mode, self.done_event = mode, None
         try:
-            strategies = (runner.write_strategies(work, self.cfg.strategies)
-                          if mode != "uninstall" else None)
+            inv = runner.build(mode, strategies=self.cfg.strategies, hosts=self.cfg.hosts,
+                               tries=self.cfg.tries,
+                               dns_dot=self.dns_box.isVisible() and self.dns_box.isChecked())
         except ValueError as e:
-            self.finish(False, str(e))
+            self.finish(False, self.tr("error", msg=str(e)))
             return
-        cmd = runner.build_command(
-            runner.stage_helper(work), mode, log, source=source, strategies=strategies,
-            hosts=self.cfg.hosts, tries=self.cfg.tries,
-            dns_dot=self.dns_box.isVisible() and self.dns_box.isChecked())
-        self.mode = mode
-        self.tail = runner.LogTail(log)
-        self.done_event = None
-        self.timer.start(300)
         self.say(self.tr("auth_hint"))
+        emit = self.line.emit           # queued into the UI thread
 
         def call():
             try:
-                return subprocess.run(cmd, capture_output=True, creationflags=_NO_WINDOW).returncode
+                return runner.run(inv, emit)
             except OSError as e:
                 return e
         self.start_worker(call, self.helper_finished)
 
-    def poll_log(self):
-        if not self.tail:
-            return
-        for line in self.tail.read():
-            self.render(runner.parse_line(line))
+    def on_line(self, line: str):
+        self.render(runner.parse_line(line))
 
     def render(self, ev: runner.Event):
         tr = self.tr
         a = ev.args
         if ev.kind == "step":
-            key = a[0].split()[0] if a else ""
-            if key != "try":
+            key = a[0] if a else ""
+            if key == "verified":
+                self.say(tr("step_verified", version=a[1] if len(a) > 1 else "?"))
+            elif key != "try":
                 self.say(tr(f"step_{key}") if f"step_{key}" in tr.keys() else key)
         elif ev.kind == "baseline":
             self.say(tr("setup_baseline", score=a[0] if a else "?"))
@@ -252,8 +220,6 @@ class SetupDialog(QDialog):
             self.log.appendPlainText("    " + a[0])
 
     def helper_finished(self, rc):
-        self.poll_log()
-        self.timer.stop()
         done = self.done_event
         if isinstance(rc, Exception):
             self.finish(False, self.tr("error", msg=str(rc)))

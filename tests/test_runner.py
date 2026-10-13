@@ -1,16 +1,22 @@
 import base64
+import gzip
+import os
+import re
+import subprocess
 import sys
 
 import pytest
 
 from dpi_dashboard.setup import runner
 
+STRATS = ["--dpi-desync=multisplit", "--dpi-desync=fake"]
+
 
 def test_parse_protocol_lines():
     assert runner.parse_line("@@TRY 2 14/15\n") == runner.Event("try", ("2", "14/15"))
     assert runner.parse_line("@@DONE ok") == runner.Event("done", ("ok",))
-    assert runner.parse_line("@@ERROR no strategy worked; x") == \
-        runner.Event("error", ("no", "strategy worked; x"))
+    assert runner.parse_line("@@STEP verified v72.13") == \
+        runner.Event("step", ("verified", "v72.13"))
     assert runner.parse_line("﻿@@STEP copy\r\n") == runner.Event("step", ("copy",))
     assert runner.parse_line("plain text").kind == "text"
 
@@ -26,36 +32,68 @@ def test_log_tail_returns_only_complete_new_lines(tmp_path):
     assert t.read() == []
 
 
-def test_write_strategies_drops_unsafe(tmp_path):
-    p = runner.write_strategies(tmp_path, ["--dpi-desync=fake", "--x=$(reboot)", 'bad"'])
-    assert p.read_text().splitlines() == ["--dpi-desync=fake"]
+def test_unsafe_strategies_never_reach_the_helper():
+    assert runner.valid_strategies(["--dpi-desync=fake", "--x=$(reboot)", 'bad"']) == \
+        ["--dpi-desync=fake"]
     with pytest.raises(ValueError):
-        runner.write_strategies(tmp_path, ["rm -rf /"])
+        runner.valid_strategies(["rm -rf /"])
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Linux command")
-def test_linux_command(tmp_path, monkeypatch):
+def test_linux_helper_comes_from_memory_not_disk(monkeypatch):
     monkeypatch.setattr(runner.os, "geteuid", lambda: 1000)
-    cmd = runner.build_command(tmp_path / "h.sh", "install", tmp_path / "log",
-                               source=tmp_path / "src", strategies=tmp_path / "s.txt",
-                               hosts=["a.com", "b.com"], tries=2, dns_dot=True)
-    assert cmd[:3] == ["pkexec", "/bin/bash", str(tmp_path / "h.sh")]
-    assert cmd[3:5] == ["install", str(tmp_path / "log")]
-    assert cmd[cmd.index("--hosts") + 1] == "a.com b.com" and "--dns-dot" in cmd
-    none = runner.build_command(tmp_path / "h.sh", "tune", tmp_path / "log", elevate="none")
-    assert none[0] == "/bin/bash"
+    inv = runner.build("install", strategies=STRATS, hosts=["a.com", "b.com"], tries=2,
+                       dns_dot=True)
+    assert inv.args[:4] == ["pkexec", "/bin/bash", "-c", runner.LINUX_BOOTSTRAP]
+    assert inv.stdin == runner.helper_text("setup-linux.sh").encode()
+    assert inv.log is None
+    assert not any(a.endswith((".sh", ".txt", ".log")) for a in inv.args)   # no files
+    rest = inv.args[5:]
+    assert rest[:5] == ["install", "--tries", "2", "--hosts", "a.com b.com"]
+    assert rest.count("--strategy") == 2 and "--dns-dot" in rest
+    assert runner.build("tune", strategies=STRATS, elevate="none").args[0] == "/bin/bash"
 
 
-def test_windows_command(tmp_path, monkeypatch):
+@pytest.mark.skipif(sys.platform == "win32", reason="needs bash")
+def test_linux_bootstrap_runs_the_piped_script():
+    """The real bootstrap: the script arrives on stdin, its arguments on the command line."""
+    inv = runner.Invocation(["/bin/bash", "-c", runner.LINUX_BOOTSTRAP, "x", "one", "two words"],
+                            stdin=b'echo "args:$#:$1:$2"; read -r line; echo "stdin:[$line]"\n')
+    lines = []
+    assert runner.run(inv, lines.append) == 0
+    assert lines == ["args:2:one:two words", "stdin:[]"]   # the script cannot read stdin
+
+
+def windows_inner(monkeypatch, mode, **kw):
     monkeypatch.setattr(runner.sys, "platform", "win32")
-    helper = tmp_path / "it's here" / "setup.ps1"
-    cmd = runner.build_command(helper, "tune", tmp_path / "log", hosts=["a.com"], tries=3)
-    assert cmd[:2] == ["powershell", "-NoProfile"]
-    enc = cmd[-1].split("'-EncodedCommand','")[1].split("'")[0]
-    inner = base64.b64decode(enc).decode("utf-16-le")
-    assert "'" + str(helper).replace("'", "''") + "'" in inner   # quoted for PowerShell
-    # Parameter names must be bare: a quoted '-Mode' is bound as a plain string.
-    assert "-Mode 'tune'" in inner and "'-Mode'" not in inner
-    assert "@@ERROR" in inner              # failures before the helper runs reach the log
-    direct = runner.build_command(helper, "tune", tmp_path / "log", elevate="none")
-    assert direct[direct.index("-File") + 1] == str(helper)
+    inv = runner.build(mode, strategies=STRATS, hosts=["a.com"], tries=3, log_name="0123abcd",
+                       **kw)
+    enc = inv.args[-1] if kw.get("elevate") == "none" else \
+        inv.args[-1].split("'-EncodedCommand','")[1].split("'")[0]
+    return inv, base64.b64decode(enc).decode("utf-16-le")
+
+
+def test_windows_helper_is_embedded_not_a_file(monkeypatch):
+    inv, inner = windows_inner(monkeypatch, "tune")
+    assert inv.args[:2] == ["powershell", "-NoProfile"] and "-Verb RunAs" in inv.args[-1]
+    packed = re.search(r"FromBase64String\('([^']+)'\)", inner).group(1)
+    assert gzip.decompress(base64.b64decode(packed)).decode() == \
+        runner.helper_text("setup-windows.ps1")
+    # Parameter names bare, values quoted; strategies joined with "|".
+    assert "-Mode 'tune' -LogName '0123abcd'" in inner and "'-Mode'" not in inner
+    assert "-Strategies '--dpi-desync=multisplit|--dpi-desync=fake'" in inner
+    assert inv.log.parts[-3:] == ("dpi-dashboard", "logs", "0123abcd.log")
+    assert ".ps1" not in inv.args[-1]
+    assert len(subprocess.list2cmdline(inv.args)) < runner.WINDOWS_COMMAND_LIMIT
+
+
+def test_windows_direct_command(monkeypatch):
+    inv, inner = windows_inner(monkeypatch, "install", elevate="none")
+    assert inv.args[:2] == ["powershell", "-NoProfile"] and "-EncodedCommand" in inv.args
+    assert "-Mode 'install'" in inner
+
+
+def test_windows_log_path_uses_programdata(monkeypatch):
+    monkeypatch.setitem(os.environ, "ProgramData", os.path.join("X", "PD"))
+    assert runner.windows_log_path("n") == \
+        runner.Path("X", "PD", "dpi-dashboard", "logs", "n.log")
