@@ -156,3 +156,24 @@ def test_release_info(tmp_path):
 def test_release_info_is_validated(tmp_path, change, reason):
     ok, out = call(tmp_path, ["read_release"], f"read_release {release_json(tmp_path, **change)}")
     assert not ok and reason in out
+
+
+def test_fetch_retries_dropped_connections_but_not_refusals(tmp_path):
+    """curl is replaced by a stub: two drops then success; and a 403 that must not retry."""
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "curl").write_text('#!/bin/bash\nn=$(cat "$CALLS" 2>/dev/null || echo 0); '
+                               'echo $((n+1)) >"$CALLS"\n'
+                               'if [ "$MODE" = deny ]; then echo 403; exit 0; fi\n'
+                               '[ "$n" -lt 2 ] && exit 35\necho 200\n')
+    (stub / "curl").chmod(0o755)
+    (stub / "sleep").write_text("#!/bin/sh\n")
+    (stub / "sleep").chmod(0o755)
+    base = f'export PATH={stub}:$PATH CALLS={tmp_path}/calls; log() {{ echo "$*"; }}; ' \
+           'fail() { echo "FAIL $*"; exit 1; }; '
+    ok, out = call(tmp_path, ["fetch"], base + f"fetch https://x {tmp_path}/f && echo OK")
+    assert ok and "OK" in out and out.count("interrupted") == 2
+    (tmp_path / "calls").unlink()
+    ok, out = call(tmp_path, ["fetch"], base + "MODE=deny; export MODE; "
+                   f"fetch https://x {tmp_path}/f")
+    assert not ok and "request limit" in out and (tmp_path / "calls").read_text().strip() == "1"

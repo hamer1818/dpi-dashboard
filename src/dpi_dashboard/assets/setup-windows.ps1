@@ -111,15 +111,23 @@ function Get-Url([string]$url, [string]$outFile) {
     if ($env:GITHUB_TOKEN -and $url.StartsWith('https://api.github.com/')) {
         $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN"
     }
-    try {
-        Invoke-WebRequest -Uri $url -OutFile $outFile -Headers $headers -UseBasicParsing -TimeoutSec 120
-    } catch {
-        $code = $null
-        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
-        if ($code -eq 403 -or $code -eq 429) {
-            Fail "GitHub's request limit was reached for this network; try again in an hour"
+    # Retries dropped connections and server errors, not refusals.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $outFile -Headers $headers -UseBasicParsing -TimeoutSec 120
+            return
+        } catch {
+            $code = $null
+            if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+            if ($code -eq 403 -or $code -eq 429) {
+                Fail "GitHub's request limit was reached for this network; try again in an hour"
+            }
+            if (($code -and $code -lt 500) -or $attempt -eq 3) {
+                Fail "download failed: $($_.Exception.Message)"
+            }
+            Log "download interrupted (attempt $attempt of 3)"
+            Start-Sleep -Seconds (3 * $attempt)
         }
-        Fail "download failed: $($_.Exception.Message)"
     }
 }
 

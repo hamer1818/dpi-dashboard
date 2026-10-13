@@ -90,15 +90,19 @@ check_strategies() {
 
 # --- download and verification (all inside $WORK, which only root can write) ----------
 
-fetch() {  # fetch URL FILE [header]
-    local code
-    code=$(curl -sSL --proto '=https' --tlsv1.2 --max-time 120 -o "$2" -w '%{http_code}' \
-        -H 'User-Agent: dpi-dashboard' ${3:+-H "$3"} "$1") || return 1
-    case $code in
-        200) return 0 ;;
-        403|429) fail "GitHub's request limit was reached for this network; try again in an hour" ;;
-        *) return 1 ;;
-    esac
+fetch() {  # fetch URL FILE [header]; retries dropped connections, not refusals
+    local code attempt
+    for attempt in 1 2 3; do
+        code=$(curl -sSL --proto '=https' --tlsv1.2 --max-time 120 -o "$2" -w '%{http_code}' \
+            -H 'User-Agent: dpi-dashboard' ${3:+-H "$3"} "$1" </dev/null) || code=000
+        case $code in
+            200) return 0 ;;
+            403|429) fail "GitHub's request limit was reached for this network; try again in an hour" ;;
+            000|5??) log "download interrupted (attempt $attempt of 3)"; sleep $((attempt * 3)) ;;
+            *) return 1 ;;
+        esac
+    done
+    return 1
 }
 
 # Prints "tag archive_url sha256 sums_url" for the Linux archive of a release JSON.
