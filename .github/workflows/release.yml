@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    # Builds also run on feature branches so packaging changes are tested before a tag;
+    # only a tag publishes.
+    branches: ["feature/**"]
 
 permissions:
   contents: read
@@ -26,7 +29,19 @@ jobs:
           --name dpi-dashboard
           --icon src/dpi_dashboard/assets/icon.ico
           --collect-data dpi_dashboard
+          --add-data "LICENSE;licenses"
+          --add-data "THIRD_PARTY_NOTICES.md;licenses"
+          --add-data "licenses;licenses"
           packaging/windows/entry.py
+      - name: The program carries its license texts
+        run: |
+          $list = pyi-archive_viewer --list --recursive dist\dpi-dashboard.exe | Out-String
+          foreach ($f in 'licenses\GPL-3.0.txt', 'licenses\LGPL-3.0.txt', 'licenses\LICENSE', 'licenses\THIRD_PARTY_NOTICES.md') {
+            if ($list -notmatch [regex]::Escape($f)) { throw "missing from the exe: $f" }
+          }
+      - name: License texts for the release
+        shell: pwsh
+        run: Compress-Archive -Path LICENSE, THIRD_PARTY_NOTICES.md, licenses -DestinationPath dist\licenses.zip
       - name: Check that the packaged app starts
         shell: pwsh
         env:
@@ -37,7 +52,9 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
-          path: dist/dpi-dashboard.exe
+          path: |
+            dist/dpi-dashboard.exe
+            dist/licenses.zip
 
   python:
     runs-on: ubuntu-latest
@@ -56,6 +73,7 @@ jobs:
           path: dist/*
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [windows, python]
     runs-on: ubuntu-latest
     permissions:
@@ -70,6 +88,7 @@ jobs:
       - name: Name the Windows build and write checksums
         run: |
           mv artifacts/dpi-dashboard.exe "artifacts/dpi-dashboard-${GITHUB_REF_NAME}-windows-x64.exe"
+          mv artifacts/licenses.zip "artifacts/dpi-dashboard-${GITHUB_REF_NAME}-licenses.zip"
           cd artifacts && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
       # Lets anyone check that a file came from this workflow:
       #   gh attestation verify FILE --repo hamer1818/dpi-dashboard

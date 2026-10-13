@@ -315,4 +315,11 @@ that is not detected automatically, please open an issue with the name.
 
 ## License
 
-[MIT](LICENSE)
+The source code is under the [MIT license](LICENSE).
+
+The Windows program also contains PyQt6, which is licensed under the GNU GPL v3, so the
+`.exe` as a whole is distributed under the GPL v3. The Python package and the Linux
+install contain only DPI Dashboard's own code. Every bundled part, its license and where
+to get its source are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); the
+license texts are in [`licenses/`](licenses/), inside the program, and in each release's
+`*-licenses.zip`. The app shows this under **About and licenses**.

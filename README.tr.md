@@ -251,4 +251,11 @@ nasıl kullandığınızdan siz sorumlusunuz. Yazılım garantisiz sunulur, bkz.
 
 ## Lisans
 
-[MIT](LICENSE)
+Kaynak kodu [MIT lisansı](LICENSE) ile sunulur.
+
+Windows programı ayrıca GNU GPL v3 lisanslı PyQt6'yı içerir; bu yüzden `.exe` bir bütün
+olarak GPL v3 ile dağıtılır. Python paketi ve Linux kurulumu yalnızca DPI Dashboard'un
+kendi kodunu içerir. Programa giren her parça, lisansı ve kaynağının nereden alınacağı
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)'de listelenmiştir; lisans metinleri
+[`licenses/`](licenses/) klasöründe, programın içinde ve her sürümün `*-licenses.zip`
+dosyasındadır. Uygulama bunu **Hakkında ve lisanslar** bağlantısında gösterir.

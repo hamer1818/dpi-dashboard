@@ -74,3 +74,12 @@ def test_results_and_cancel(app):
 def test_config_warning_is_shown(app):
     w = window(ServiceState(True, True, True), warning="config.json: ignored tries")
     assert "ignored tries" in w.msg.text()
+
+
+def test_about_shows_licenses_and_warranty(app):
+    from dpi_dashboard import __version__
+    w = window(ServiceState(True, True, True))
+    text = w.about_text()
+    for part in ("MIT", "GPL", "LGPL", "NO WARRANTY", __version__, "THIRD_PARTY_NOTICES.md"):
+        assert part in text
+    assert "About and licenses" in w.about.text()

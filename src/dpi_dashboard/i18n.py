@@ -31,6 +31,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "reason_tls": "TLS error",
         "reason_no-http": "no HTTP answer",
         "reason_error": "network error",
+        "about_link": "About and licenses",
+        "about_title": "About DPI Dashboard",
+        "about_text": "<b>DPI Dashboard {version}</b><br>Copyright © 2026 hamer1818<br><br>"
+                      "Source code: MIT license.<br>"
+                      "<a href='{repo}'>{repo}</a><br><br>"
+                      "Builds that include PyQt6, like the Windows program, also contain "
+                      "PyQt6 (GPL-3.0), Qt 6 (LGPL-3.0), PyQt6-sip (BSD-2-Clause) and Python "
+                      "(PSF-2.0) and are distributed under the GNU GPL v3. "
+                      "<a href='{notices}'>Licenses and sources of all parts</a>.<br><br>"
+                      "This program comes with ABSOLUTELY NO WARRANTY.",
         "setup_btn": "Setup",
         "close": "Close",
         "setup_title": "Setup and repair",
@@ -116,6 +126,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "reason_tls": "TLS hatası",
         "reason_no-http": "HTTP yanıtı yok",
         "reason_error": "ağ hatası",
+        "about_link": "Hakkında ve lisanslar",
+        "about_title": "DPI Dashboard hakkında",
+        "about_text": "<b>DPI Dashboard {version}</b><br>Telif hakkı © 2026 hamer1818<br><br>"
+                      "Kaynak kodu: MIT lisansı.<br>"
+                      "<a href='{repo}'>{repo}</a><br><br>"
+                      "PyQt6 içeren derlemeler (Windows programı gibi) ayrıca PyQt6 (GPL-3.0), "
+                      "Qt 6 (LGPL-3.0), PyQt6-sip (BSD-2-Clause) ve Python (PSF-2.0) içerir ve "
+                      "GNU GPL v3 ile dağıtılır. "
+                      "<a href='{notices}'>Tüm parçaların lisansları ve kaynakları</a>.<br><br>"
+                      "Bu program HİÇBİR GARANTİ olmadan sunulur.",
         "setup_btn": "Kurulum",
         "close": "Kapat",
         "setup_title": "Kurulum ve onarım",

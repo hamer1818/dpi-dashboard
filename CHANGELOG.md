@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+- Licensing made explicit. The source code stays MIT. The Windows program contains PyQt6
+  (GPL-3.0), Qt 6 (LGPL-3.0), PyQt6-sip (BSD-2-Clause) and Python (PSF-2.0), so the
+  `.exe` as a whole is distributed under the GNU GPL v3. Added `THIRD_PARTY_NOTICES.md`
+  with every bundled part, its license and its source, the license texts in `licenses/`
+  (also inside the `.exe` and as `*-licenses.zip` in each release), and an
+  **About and licenses** link in the window.
+
 ## 0.3.0 — security
 
 - **Nothing a normal user can write is executed or trusted with administrator rights.**

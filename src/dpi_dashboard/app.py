@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -24,6 +25,7 @@ from .i18n import Translator
 from .probe import HostResult, check_hosts
 
 GREEN, RED, AMBER, GRAY = "#2e9e44", "#d23c3c", "#d08a00", "#8a8a8a"
+REPO = "https://github.com/hamer1818/dpi-dashboard"
 
 
 def icon() -> QIcon:
@@ -120,6 +122,11 @@ class Dashboard(QWidget):
         lay.addLayout(grid)
         lay.addWidget(self.msg)
         lay.addStretch(1)
+        # The GPL asks interactive programs to show where the license can be read.
+        self.about = QLabel(f"<a href='#about'>{tr('about_link')}</a>")
+        self.about.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.about.linkActivated.connect(self.show_about)
+        lay.addWidget(self.about)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -234,6 +241,19 @@ class Dashboard(QWidget):
             self.backend = None
         self.msg.setText("")
         self.refresh()
+
+    def about_text(self) -> str:
+        return self.tr("about_text", version=__version__, repo=REPO,
+                       notices=f"{REPO}/blob/v{__version__}/THIRD_PARTY_NOTICES.md")
+
+    def show_about(self, _link: str = ""):
+        box = QMessageBox(self)
+        box.setWindowTitle(self.tr("about_title"))
+        box.setIconPixmap(icon().pixmap(64, 64))
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        box.setText(self.about_text())
+        box.exec()
 
     def open_settings(self):
         path = config.ensure_file()
