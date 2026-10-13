@@ -35,9 +35,10 @@ jobs:
           packaging/windows/entry.py
       - name: The program carries its license texts
         run: |
-          $list = pyi-archive_viewer --list --recursive dist\dpi-dashboard.exe | Out-String
-          foreach ($f in 'licenses\GPL-3.0.txt', 'licenses\LGPL-3.0.txt', 'licenses\LICENSE', 'licenses\THIRD_PARTY_NOTICES.md') {
-            if ($list -notmatch [regex]::Escape($f)) { throw "missing from the exe: $f" }
+          $list = pyi-archive_viewer --list --recursive dist\dpi-dashboard.exe
+          $list | Select-String -Pattern 'licen|NOTICES' | ForEach-Object { $_.Line.Trim() }
+          foreach ($f in 'GPL-3.0.txt', 'LGPL-3.0.txt', 'Python-PSF-2.0.txt', 'LICENSE', 'THIRD_PARTY_NOTICES.md') {
+            if (-not ($list | Select-String -Pattern ('licenses[\\/]' + [regex]::Escape($f)))) { throw "missing from the exe: $f" }
           }
       - name: License texts for the release
         shell: pwsh
