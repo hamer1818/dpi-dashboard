@@ -13,6 +13,11 @@ DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 APP="$DATA/dpi-dashboard"
 BIN="$HOME/.local/bin"
 
+# Run a cache-refresh tool if this desktop has it; never fail because of it.
+run_if_present() {
+    if command -v "$1" >/dev/null 2>&1; then "$@" >/dev/null 2>&1 || true; fi
+}
+
 say()  { printf '\033[1m%s\033[0m\n' "$*"; }
 warn() { printf '\033[33m! %s\033[0m\n' "$*" >&2; }
 
@@ -40,10 +45,10 @@ install -m 0644 "$SRC/src/dpi_dashboard/assets/icon.svg" \
 sed "s|^Exec=.*|Exec=$APP/venv/bin/dpi-dashboard|" "$SRC/packaging/linux/dpi-dashboard.desktop" \
     > "$DATA/applications/dpi-dashboard.desktop"
 
-command -v update-desktop-database >/dev/null && update-desktop-database -q "$DATA/applications" || true
-command -v gtk-update-icon-cache  >/dev/null && gtk-update-icon-cache -q -t "$DATA/icons/hicolor" || true
-command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 >/dev/null 2>&1 || true
-command -v kbuildsycoca5 >/dev/null && kbuildsycoca5 >/dev/null 2>&1 || true
+run_if_present update-desktop-database -q "$DATA/applications"
+run_if_present gtk-update-icon-cache -q -t "$DATA/icons/hicolor"
+run_if_present kbuildsycoca6
+run_if_present kbuildsycoca5
 
 say "Installed: search for \"DPI Dashboard\" in your application menu."
 
