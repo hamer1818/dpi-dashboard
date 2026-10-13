@@ -152,6 +152,24 @@ jobs:
           Get-Process winws
           (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\zapret).ImagePath
           if (-not (Test-Path "$env:ProgramFiles\zapret\.installed-by-dpi-dashboard")) { throw 'marker missing' }
+      - name: Log folder is locked (users read, cannot write)
+        run: |
+          $users = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-545')
+          $deny = [System.Security.AccessControl.FileSystemRights]'Write, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership'
+          foreach ($p in "$env:ProgramData\dpi-dashboard", "$env:ProgramData\dpi-dashboard\logs") {
+            $acl = Get-Acl -LiteralPath $p
+            $acl.Access | Format-Table IdentityReference, FileSystemRights, IsInherited -AutoSize | Out-String | Write-Host
+            if (-not $acl.AreAccessRulesProtected) { throw "$p inherits permissions" }
+            $owner = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+            if ($owner -notin 'S-1-5-32-544', 'S-1-5-18') { throw "$p is owned by $owner" }
+            foreach ($r in $acl.Access) {
+              $sid = $r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier])
+              if ($sid.Value -notin 'S-1-5-32-544', 'S-1-5-18', 'S-1-5-32-545') { throw "unexpected entry $sid on $p" }
+              if ($sid -eq $users -and ($r.FileSystemRights -band $deny)) { throw "users can change $p" }
+            }
+          }
+          if (Get-ChildItem "$env:ProgramData\dpi-dashboard" -Directory -Filter 'work-*') { throw 'work folder left behind' }
+          Get-ChildItem "$env:ProgramData\dpi-dashboard\logs" | Format-Table Name, Length
       - name: Status from the app's point of view
         run: |
           python -m dpi_dashboard.setup check | Tee-Object status.json
