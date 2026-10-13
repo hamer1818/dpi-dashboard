@@ -142,7 +142,9 @@ CONF
 }
 
 do_tune() {
-    [ -f "$ZDIR/config" ] && [ -x "$ZDIR/init.d/sysv/zapret" ] || fail "zapret is not installed in $ZDIR"
+    if [ ! -f "$ZDIR/config" ] || [ ! -x "$ZDIR/init.d/sysv/zapret" ]; then
+        fail "zapret is not installed in $ZDIR"
+    fi
     systemctl cat zapret.service >/dev/null 2>&1 || fail "zapret.service not found"
     read_strategies
     [ "$DNSDOT" = 1 ] && setup_dot
@@ -190,8 +192,9 @@ do_tune() {
 }
 
 do_install() {
-    [ -n "$SOURCE" ] && [ -f "$SOURCE/install_bin.sh" ] && [ -f "$SOURCE/config.default" ] \
-        || fail "not a zapret release: $SOURCE"
+    if [ -z "$SOURCE" ] || [ ! -f "$SOURCE/install_bin.sh" ] || [ ! -f "$SOURCE/config.default" ]; then
+        fail "not a zapret release: $SOURCE"
+    fi
     [ -e "$ZDIR" ] && fail "$ZDIR already exists"
     systemctl cat zapret.service >/dev/null 2>&1 && fail "a zapret.service already exists"
     ensure_prereqs

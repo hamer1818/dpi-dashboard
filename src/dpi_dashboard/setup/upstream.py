@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import tarfile
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 REPO = "bol-van/zapret"
@@ -33,15 +35,25 @@ class Release:
 
 
 def _get(url: str, timeout: float = 30, opener=urlopen):
-    return opener(Request(url, headers={"User-Agent": USER_AGENT,
-                                        "Accept": "application/vnd.github+json"}),
-                  timeout=timeout)
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"}
+    # Unauthenticated API calls are limited to 60 per hour per IP address, which shared
+    # addresses (CI machines, mobile carriers) can exhaust. A token lifts that limit.
+    token = os.environ.get("GITHUB_TOKEN")
+    if token and url.startswith("https://api.github.com/"):
+        headers["Authorization"] = f"Bearer {token}"
+    return opener(Request(url, headers=headers), timeout=timeout)
 
 
 def latest_release(archive: str, opener=urlopen) -> Release:
     """archive: "tar.gz" (Linux) or "zip" (Windows)."""
-    with _get(API_LATEST, opener=opener) as r:
-        data = json.load(r)
+    try:
+        with _get(API_LATEST, opener=opener) as r:
+            data = json.load(r)
+    except HTTPError as e:
+        if e.code in (403, 429):
+            raise SetupError("GitHub's request limit was reached for this network; "
+                             "try again in an hour (or set GITHUB_TOKEN)") from e
+        raise SetupError(f"GitHub API: HTTP {e.code}") from e
     tag = data["tag_name"]
     assets = {a["name"]: a for a in data.get("assets", [])}
     name = f"zapret-{tag}.{archive}"

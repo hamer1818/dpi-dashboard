@@ -1,7 +1,9 @@
 import hashlib
 import io
 import json
+import sys
 import tarfile
+from urllib.error import HTTPError
 
 import pytest
 
@@ -69,7 +71,8 @@ def test_prepare_verifies_and_extracts(tmp_path):
     assert rel.version == VERSION and root.name == f"zapret-{VERSION}"
     nfqws = "binaries/linux-x86_64/nfqws"
     assert (root / nfqws).read_bytes() == FILES[nfqws]
-    assert (root / "install_bin.sh").stat().st_mode & 0o100
+    if sys.platform != "win32":      # Unix permission bits must survive extraction
+        assert (root / "install_bin.sh").stat().st_mode & 0o100
 
 
 def test_archive_checksum_mismatch(tmp_path):
@@ -107,3 +110,22 @@ def test_symlink_out_of_tree_is_refused(tmp_path):
     archive = make_tar(FILES, extra=[(link, b"")])
     with pytest.raises(upstream.SetupError, match="unsafe path"):
         upstream.prepare(tmp_path, "tar.gz", opener=opener_for(archive, sums_for(FILES)))
+
+
+def test_rate_limit_is_explained(tmp_path):
+    def limited(req, timeout=None):
+        raise HTTPError(req.full_url, 403, "rate limit exceeded", {}, None)
+    with pytest.raises(upstream.SetupError, match="request limit"):
+        upstream.prepare(tmp_path, "tar.gz", opener=limited)
+
+
+def test_token_is_sent_only_to_the_api(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "t0ken")
+    seen = {}
+
+    def opener(req, timeout=None):
+        seen[req.full_url] = req.get_header("Authorization")
+        return FakeResponse(b"{}")
+    upstream._get(upstream.API_LATEST, opener=opener)
+    upstream._get("https://github.com/x/download", opener=opener)
+    assert seen == {upstream.API_LATEST: "Bearer t0ken", "https://github.com/x/download": None}

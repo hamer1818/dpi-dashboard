@@ -9,6 +9,10 @@ on:
     branches: [main, "feature/**"]
   workflow_dispatch:
 
+env:
+  # The setup downloads zapret through the GitHub API, which rate-limits shared CI IPs.
+  GITHUB_TOKEN: ${{ github.token }}
+
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -19,7 +23,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -e .
       - name: Install and tune
-        run: sudo "$(command -v python)" -m dpi_dashboard.setup install --elevate none --tries 1
+        run: sudo --preserve-env=GITHUB_TOKEN "$(command -v python)" -m dpi_dashboard.setup install --elevate none --tries 1
       - name: Service is running and enabled
         run: |
           systemctl is-active zapret.service
