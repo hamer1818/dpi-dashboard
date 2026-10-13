@@ -13,8 +13,9 @@ cut in the middle of the TLS handshake as soon as the site name is seen. Tools l
 get around this, but they run as system services that you normally start and stop from
 the command line. DPI Dashboard is a front end for that service.
 
-> **DPI Dashboard does not bypass anything by itself.** It controls a bypass service you
-> have already installed. See [Requirements](#requirements).
+> **DPI Dashboard does not bypass anything by itself.** It controls a bypass service.
+> If you do not have one yet, the **Setup** button can install
+> [zapret](https://github.com/bol-van/zapret) for you, see [Setup](#setup).
 
 ## Features
 
@@ -25,6 +26,9 @@ the command line. DPI Dashboard is a front end for that service.
   timeout, DNS failure, or a rejected certificate.
 - Asks for the administrator password each time (polkit on Linux, UAC on Windows).
   No permanent "passwordless" rule is installed.
+- **Setup** for a computer that has nothing yet: finds what is missing, downloads and
+  verifies zapret, installs it as a service and picks a setting that works on your
+  connection. **Remove** undoes it.
 - English and Turkish, picked from the system language.
 - Linux (systemd) and Windows.
 
@@ -37,9 +41,10 @@ the command line. DPI Dashboard is a front end for that service.
 | Password prompt | polkit with an authentication agent (KDE and GNOME have one) | UAC |
 | Python (only when not using the `.exe`) | 3.10+ with PyQt6 | 3.10+ with PyQt6 |
 
-If your service has a different name, set it in the [settings file](#settings).
+If you have none of these, use [Setup](#setup). If your service has a different name, set
+it in the [settings file](#settings).
 
-Not supported: Linux systems without systemd (OpenRC, runit, s6), macOS.
+Not supported: Linux systems without systemd (OpenRC, runit, s6), macOS, Windows on ARM.
 
 ## Install
 
@@ -77,6 +82,49 @@ dpi-dashboard
 
 This does not add a menu entry on Linux; use the install script for that.
 
+## Setup
+
+**Setup** checks the computer and shows what it found: whether the service and the zapret
+files are there, which tools are missing, and whether DNS answers look forged. Then it
+offers one of:
+
+- **Install zapret and find a working setting** (nothing installed yet), or
+- **Find the best setting again** (zapret is installed, e.g. after your provider changed
+  how it blocks).
+
+Installing does this, asking for the administrator password once:
+
+1. Downloads the latest release from
+   [github.com/bol-van/zapret](https://github.com/bol-van/zapret/releases). The archive
+   must match the SHA-256 checksum published by GitHub, and every program inside it must
+   match upstream's own `sha256sum.txt`. Otherwise nothing is installed.
+2. Linux: copies it to `/opt/zapret`, links the programs for your processor
+   (`install_bin.sh`), writes the config and the `zapret.service` unit. Missing `curl` or
+   `nftables` are installed with your package manager (pacman, apt, dnf, zypper).
+   Windows: copies `winws` and WinDivert to `%ProgramFiles%\zapret` and creates the
+   `zapret` service.
+3. Measures the sites from your settings with zapret off, then tries the strategies one
+   by one and keeps the first that reaches all of them (or the best one). If none helps,
+   the previous settings are restored.
+4. Turns the service on and sets it to start at boot.
+
+**Remove** stops and deletes the service and the files. It only removes what DPI
+Dashboard installed: a zapret from a distribution package or another installer is
+never deleted. On Windows, a service installed by another tool is only turned on and
+off, never reconfigured.
+
+On Linux with systemd-resolved, setup can also turn on encrypted DNS (DNS-over-TLS) when
+DNS answers look forged. On Windows it shows how to turn on DNS over HTTPS instead.
+
+The strategies tried, in order, are listed in
+[`setup/strategies.py`](src/dpi_dashboard/setup/strategies.py); put your own in the
+`strategies` setting. The same steps can be run from a terminal:
+
+```bash
+python -m dpi_dashboard.setup check
+python -m dpi_dashboard.setup install      # or: tune, uninstall
+```
+
 ## Settings
 
 The **Settings** button opens the settings file, creating it with defaults on first
@@ -94,7 +142,8 @@ use:
   "tries": 3,
   "timeout": 6.0,
   "language": "auto",
-  "refresh_seconds": 2.0
+  "refresh_seconds": 2.0,
+  "strategies": ["--dpi-desync=multidisorder --dpi-desync-split-pos=2 --dpi-desync-split-seqovl=1", "..."]
 }
 ```
 
@@ -107,6 +156,7 @@ use:
 | `timeout` | Seconds per attempt. |
 | `language` | `auto`, `en` or `tr` |
 | `refresh_seconds` | How often the status is re-read. |
+| `strategies` | zapret options for HTTPS that Setup tries, in order. Only plain option characters are accepted. |
 
 Invalid values are ignored and reported in the window. Restart the app after editing.
 
@@ -132,10 +182,17 @@ Invalid values are ignored and reported in the window. Restart the app after edi
 running. Desktop environments like KDE and GNOME start one; minimal window managers
 need one added (for example `polkit-gnome` or `lxqt-policykit`).
 
-**The service is on but sites still fail with "connection reset".** The bypass strategy
-does not match how your provider blocks. That is configured in zapret/GoodbyeDPI itself
-(zapret's `blockcheck.sh` helps you find one); DPI Dashboard only turns the service on
-and off.
+**The service is on but sites still fail with "connection reset".** The strategy does not
+match how your provider blocks. Run **Setup → Find the best setting again**. If none of
+the built-in strategies works, zapret's `blockcheck.sh` can find one; add it to the
+`strategies` setting.
+
+**Setup says "no strategy worked".** Your previous settings were put back. Check DNS
+first (see below), then try `blockcheck.sh`.
+
+**Windows: the service does not start after setup.** Antivirus software sometimes blocks
+WinDivert, the driver zapret uses. Check its quarantine. WinDivert also does not work on
+Windows on ARM.
 
 **"name not resolved (DNS)" or wrong results only for some sites.** Some providers also
 falsify DNS answers, which a DPI bypass does not fix. Use encrypted DNS: DNS over HTTPS
@@ -168,7 +225,11 @@ pyinstaller --onefile --windowed --name dpi-dashboard --icon src/dpi_dashboard/a
 ```
 
 New backends live in `src/dpi_dashboard/backends/`: implement `state()` and
-`set_enabled()` from `Backend` and register the class in `KINDS`.
+`set_enabled()` from `Backend` and register the class in `KINDS`. The setup helpers are
+`src/dpi_dashboard/assets/setup-linux.sh` and `setup-windows.ps1`; they talk to the app
+through `@@` lines in a log file (see `setup/runner.py`). The
+[Setup integration](.github/workflows/setup-integration.yml) workflow runs a real install,
+retune and removal on fresh Ubuntu and Windows machines.
 
 Bug reports and pull requests are welcome. If you use a bypass tool with a service name
 that is not detected automatically, please open an issue with the name.

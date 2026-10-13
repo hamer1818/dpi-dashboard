@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+- **Setup** button for computers that have no bypass service yet:
+  - checks the service, the zapret files, missing tools and whether DNS answers look forged;
+  - downloads the latest zapret release, verifies the archive against GitHub's SHA-256 and
+    every program against upstream's `sha256sum.txt`;
+  - installs it as a service (Linux: `/opt/zapret` + `zapret.service`, missing `curl` /
+    `nftables` from the package manager; Windows: `%ProgramFiles%\zapret` + `zapret`
+    service), asking for the administrator password once;
+  - measures the blocking, tries strategies until one reaches every test site, keeps it
+    and turns the service on; restores the previous settings if none works;
+  - **Find the best setting again** for an existing install, **Remove** for what it
+    installed. Installs from packages or other tools are never deleted.
+  - Linux: optional DNS-over-TLS in systemd-resolved when DNS looks forged.
+- `strategies` setting; `python -m dpi_dashboard.setup` command line.
+- Windows: also detects the `winws1` service of zapret-win-bundle.
+- CI runs a real install, retune and removal on fresh Ubuntu and Windows machines.
+
 ## 0.1.0
 
 First public release.

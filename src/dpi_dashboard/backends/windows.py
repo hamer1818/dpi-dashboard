@@ -8,8 +8,9 @@ import re
 from .base import Backend, Runner, ServiceState, ToggleResult, default_runner
 
 # Service names used by the common installers:
-#   zapret-discord-youtube "service.bat" -> "zapret"
-#   GoodbyeDPI "service_install_*.cmd"   -> "GoodbyeDPI"
+#   DPI Dashboard setup, zapret-discord-youtube "service.bat" -> "zapret"
+#   zapret-win-bundle "service_create.cmd"                   -> "winws1"
+#   GoodbyeDPI "service_install_*.cmd"                       -> "GoodbyeDPI"
 _VALID_NAME = re.compile(r"^[A-Za-z0-9_.\-]{1,256}$")
 _ERROR_SERVICE_DOES_NOT_EXIST = 1060
 _ERROR_CANCELLED = 1223          # UAC prompt dismissed
@@ -23,7 +24,7 @@ def _encode(script: str) -> str:
 
 class WindowsServiceBackend(Backend):
     kind = "windows-service"
-    DEFAULT_SERVICES = ("zapret", "GoodbyeDPI")
+    DEFAULT_SERVICES = ("zapret", "winws1", "GoodbyeDPI")
 
     def __init__(self, service: str, runner: Runner = default_runner):
         # The name ends up inside a PowerShell command line.

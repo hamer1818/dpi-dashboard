@@ -1,0 +1,104 @@
+# Runs the real setup on fresh CI machines: download and verify zapret, install it as a
+# service, pick a strategy, check that the bypass process runs and that the internet still
+# works, then uninstall and check that nothing is left behind.
+# The CI machines are already administrators, so the helpers run with --elevate none.
+name: Setup integration
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Install and tune
+        run: sudo "$(command -v python)" -m dpi_dashboard.setup install --elevate none --tries 1
+      - name: Service is running and enabled
+        run: |
+          systemctl is-active zapret.service
+          systemctl is-enabled zapret.service
+          pgrep -a nfqws
+          test -f /opt/zapret/.installed-by-dpi-dashboard
+          sed -n '/^NFQWS_OPT=/,/^"/p' /opt/zapret/config
+      - name: Status from the app's point of view
+        run: |
+          python -m dpi_dashboard.setup check | tee status.json
+          python -c "import json; s = json.load(open('status.json')); assert s['service_found'] and s['managed'], s"
+      - name: Internet still works with zapret on
+        run: |
+          python - <<'PY'
+          from dpi_dashboard.probe import check_hosts
+          r = check_hosts(["github.com", "example.com", "discord.com"], tries=2)
+          for x in r:
+              print(x.host, x.successes, x.reasons)
+          assert all(x.successes == 2 for x in r)
+          PY
+      - name: Retune an existing install
+        run: sudo "$(command -v python)" -m dpi_dashboard.setup tune --elevate none --tries 1
+      - name: Uninstall
+        run: |
+          sudo "$(command -v python)" -m dpi_dashboard.setup uninstall --elevate none
+          ! systemctl cat zapret.service 2>/dev/null
+          test ! -e /opt/zapret
+          ! pgrep nfqws
+      - name: Logs
+        if: failure()
+        run: |
+          sudo journalctl -u zapret.service -n 60 --no-pager || true
+          sudo sh -c 'cat /tmp/dpi-dashboard-setup-*/setup.log' || true
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Install and tune
+        run: |
+          python -m dpi_dashboard.setup install --elevate none --tries 1
+          if ($LASTEXITCODE -ne 0) { throw "setup failed: $LASTEXITCODE" }
+      - name: Service is running and starts automatically
+        run: |
+          $s = Get-Service zapret
+          $s | Format-List Name, Status, StartType
+          if ($s.Status -ne 'Running') { throw 'service is not running' }
+          if ($s.StartType -ne 'Automatic') { throw 'service is not automatic' }
+          Get-Process winws
+          (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\zapret).ImagePath
+          if (-not (Test-Path "$env:ProgramFiles\zapret\.installed-by-dpi-dashboard")) { throw 'marker missing' }
+      - name: Status from the app's point of view
+        run: |
+          python -m dpi_dashboard.setup check | Tee-Object status.json
+          python -c "import json; s = json.load(open('status.json')); assert s['service_found'] and s['managed'], s"
+      - name: Internet still works with zapret on
+        run: |
+          python -c "from dpi_dashboard.probe import check_hosts; r = check_hosts(['github.com', 'example.com', 'discord.com'], tries=2); print([(x.host, x.successes, x.reasons) for x in r]); assert all(x.successes == 2 for x in r)"
+      - name: The app's own backend controls the service
+        run: |
+          python -c "from dpi_dashboard.backends import detect_backend; b = detect_backend(); print(b.label, b.state()); s = b.state(); assert b.service == 'zapret' and s.installed and s.active and s.enabled"
+      - name: Retune an existing install
+        run: |
+          python -m dpi_dashboard.setup tune --elevate none --tries 1
+          if ($LASTEXITCODE -ne 0) { throw "tune failed: $LASTEXITCODE" }
+      - name: Uninstall
+        run: |
+          python -m dpi_dashboard.setup uninstall --elevate none
+          if ($LASTEXITCODE -ne 0) { throw "uninstall failed: $LASTEXITCODE" }
+          if (Get-Service zapret -ErrorAction SilentlyContinue) { throw 'service still exists' }
+          if (Test-Path "$env:ProgramFiles\zapret") { throw 'folder still exists' }
+          if (Get-Process winws -ErrorAction SilentlyContinue) { throw 'winws still running' }
+      - name: Logs
+        if: failure()
+        run: Get-ChildItem $env:TEMP -Filter 'dpi-dashboard-setup-*' -Directory | ForEach-Object { Get-Content (Join-Path $_.FullName 'setup.log') -ErrorAction SilentlyContinue }

@@ -89,10 +89,13 @@ class Dashboard(QWidget):
 
         self.test_btn = QPushButton(QIcon.fromTheme("view-refresh"), tr("test"))
         self.test_btn.clicked.connect(self.run_test)
+        self.setup_btn = QPushButton(QIcon.fromTheme("run-build-install"), tr("setup_btn"))
+        self.setup_btn.clicked.connect(self.open_setup)
         self.settings_btn = QPushButton(QIcon.fromTheme("configure"), tr("settings"))
         self.settings_btn.clicked.connect(self.open_settings)
         buttons = QHBoxLayout()
         buttons.addWidget(self.test_btn, 1)
+        buttons.addWidget(self.setup_btn)
         buttons.addWidget(self.settings_btn)
 
         line = QFrame()
@@ -216,6 +219,21 @@ class Dashboard(QWidget):
         self.msg.setText(self.tr("all_ok") if good == len(results) else self.tr("some_blocked"))
         self.test_btn.setText(self.tr("test"))
         self.test_btn.setEnabled(True)
+
+    def open_setup(self):
+        from .setup_dialog import SetupDialog
+        dlg = SetupDialog(self.cfg, self.tr, self)
+        dlg.changed.connect(self.reload_backend)
+        dlg.exec()
+
+    def reload_backend(self):
+        """Look for the service again, e.g. after the setup installed it."""
+        try:
+            self.backend = detect_backend(self.cfg.backend, self.cfg.service)
+        except ValueError:
+            self.backend = None
+        self.msg.setText("")
+        self.refresh()
 
     def open_settings(self):
         path = config.ensure_file()

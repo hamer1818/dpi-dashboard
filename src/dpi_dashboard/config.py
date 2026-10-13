@@ -8,6 +8,8 @@ import sys
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
+from .setup.strategies import STRATEGIES, is_safe
+
 BACKENDS = ("auto", "systemd", "windows-service")
 LANGUAGES = ("auto", "en", "tr")
 DEFAULT_HOSTS = ["discord.com", "gateway.discord.gg", "cdn.discordapp.com",
@@ -23,6 +25,7 @@ class Config:
     timeout: float = 6.0
     language: str = "auto"          # "auto", "en" or "tr"
     refresh_seconds: float = 2.0
+    strategies: list[str] = field(default_factory=lambda: list(STRATEGIES))  # setup order
 
 
 def config_path() -> Path:
@@ -54,6 +57,9 @@ def load(path: Path | None = None) -> tuple[Config, str | None]:
             cfg.service = v.strip() if v and v.strip() else None
         elif k == "hosts" and isinstance(v, list) and all(isinstance(h, str) for h in v):
             cfg.hosts = [h.strip() for h in v if h.strip()]
+        elif (k == "strategies" and isinstance(v, list) and v
+              and all(isinstance(x, str) and is_safe(x.strip()) for x in v)):
+            cfg.strategies = [x.strip() for x in v]
         elif k == "backend" and v in BACKENDS:
             cfg.backend = v
         elif k == "language" and v in LANGUAGES:
