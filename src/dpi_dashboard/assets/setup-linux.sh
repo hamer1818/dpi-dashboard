@@ -63,6 +63,8 @@ ensure_prereqs() {
     [ -d /run/systemd/system ] || fail "systemd is required"
     have curl || install_pkgs curl || true
     have curl || fail "curl is required and could not be installed"
+    have awk || install_pkgs gawk || true
+    have awk || fail "awk is required and could not be installed"
     if ! have nft && ! have iptables; then install_pkgs nftables || true; fi
     have nft || have iptables || fail "nftables or iptables is required and could not be installed"
 }
@@ -120,10 +122,15 @@ probe_all() {
     echo "$ok"
 }
 
+# Without pgrep: procps is not installed on every system.
+nfqws_running() {
+    grep -qx nfqws /proc/[0-9]*/comm 2>/dev/null
+}
+
 service_running() {
     systemctl restart zapret.service >>"$LOG" 2>&1 || return 1
     sleep 2
-    systemctl is-active -q zapret.service && pgrep -x nfqws >/dev/null
+    systemctl is-active -q zapret.service && nfqws_running
 }
 
 setup_dot() {
@@ -203,6 +210,11 @@ do_install() {
     cp -a "$SOURCE" "$ZDIR" || fail "copy failed"
     chown -R root:root "$ZDIR"
     chmod -R go-w "$ZDIR"
+    # SELinux (Fedora, RHEL): files copied from the temporary directory keep a temp label
+    # that systemd may not execute. Give them the normal label for /opt.
+    if have restorecon && have selinuxenabled && selinuxenabled; then
+        restorecon -R "$ZDIR" >>"$LOG" 2>&1
+    fi
     echo "installed by DPI Dashboard on $(date -Is)" >"$MARK"
     cleanup() { rm -rf "$ZDIR" "$UNIT"; systemctl daemon-reload; }
 

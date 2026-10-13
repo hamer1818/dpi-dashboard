@@ -58,6 +58,64 @@ jobs:
           sudo journalctl -u zapret.service -n 60 --no-pager || true
           sudo sh -c 'cat /tmp/dpi-dashboard-setup-*/setup.log' || true
 
+  # Other distributions, each in a container that boots systemd. The containers share the
+  # CI machine's kernel: nfqws, NFQUEUE and the firewall are real, but SELinux is not
+  # active (the Ubuntu host has none), so Fedora's SELinux handling is not exercised.
+  distros:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fedora
+            image: fedora:latest
+            prep: dnf -y install systemd python3 && dnf clean all
+          - name: debian-12
+            image: debian:12
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv python3 && rm -rf /var/lib/apt/lists/*
+          - name: arch
+            image: archlinux:latest
+            prep: pacman -Syu --noconfirm systemd python && pacman -Scc --noconfirm
+          - name: opensuse-tumbleweed
+            image: opensuse/tumbleweed:latest
+            prep: zypper -n install systemd systemd-sysvinit python3 && zypper clean -a
+    name: distro (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load the netfilter modules zapret needs (shared host kernel)
+        run: sudo modprobe -a nfnetlink_queue nft_queue xt_NFQUEUE || true
+      - name: Build and boot
+        run: |
+          docker build -q -t distro --build-arg IMAGE='${{ matrix.image }}' --build-arg PREP='${{ matrix.prep }}' -f packaging/ci/distro.Dockerfile packaging/ci
+          docker run -d --name d --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD":/src:ro -e GITHUB_TOKEN distro
+          for i in $(seq 60); do
+            s=$(docker exec d systemctl is-system-running 2>/dev/null || true)
+            case "$s" in running|degraded) echo "systemd: $s"; break ;; esac
+            sleep 2
+          done
+          docker exec d sh -c 'cat /etc/os-release | head -2; python3 --version'
+          for t in curl nft iptables awk pgrep; do docker exec d sh -c "command -v $t >/dev/null && echo 'present: $t' || echo 'missing: $t'"; done
+      - name: Install and tune
+        run: docker exec -e PYTHONPATH=/src/src d python3 -m dpi_dashboard.setup install --elevate none --tries 1
+      - name: Service is running
+        run: |
+          docker exec d systemctl is-active zapret.service
+          docker exec d systemctl is-enabled zapret.service
+          docker exec d sh -c 'grep -lx nfqws /proc/[0-9]*/comm'
+      - name: Internet still works with zapret on
+        run: |
+          docker exec -e PYTHONPATH=/src/src d python3 -c "from dpi_dashboard.probe import check_hosts; r = check_hosts(['github.com', 'example.com', 'discord.com'], tries=2); print([(x.host, x.successes, x.reasons) for x in r]); assert all(x.successes == 2 for x in r)"
+      - name: Retune and uninstall
+        run: |
+          docker exec -e PYTHONPATH=/src/src d python3 -m dpi_dashboard.setup tune --elevate none --tries 1
+          docker exec -e PYTHONPATH=/src/src d python3 -m dpi_dashboard.setup uninstall --elevate none
+          docker exec d sh -c '! systemctl cat zapret.service 2>/dev/null && test ! -e /opt/zapret'
+      - name: Logs
+        if: failure()
+        run: |
+          docker exec d journalctl -u zapret.service -n 60 --no-pager || true
+          docker exec d sh -c 'cat /tmp/dpi-dashboard-setup-*/setup.log' || true
+
   windows:
     runs-on: windows-latest
     defaults:
