@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pyinstaller
+      - name: Build
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name dpi-dashboard
+          --icon src/dpi_dashboard/assets/icon.ico
+          --collect-data dpi_dashboard
+          packaging/windows/entry.py
+      - name: Check that the packaged app starts
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process dist\dpi-dashboard.exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed: $($p.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/dpi-dashboard.exe
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python
+          path: dist/*
+
+  release:
+    needs: [windows, python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Rename the Windows build
+        run: mv artifacts/dpi-dashboard.exe "artifacts/dpi-dashboard-${GITHUB_REF_NAME}-windows-x64.exe"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=DPI Dashboard
+GenericName=DPI bypass control
+GenericName[tr]=Engel aşma kontrolü
+Comment=Turn a DPI-bypass service (zapret) on and off and test the connection
+Comment[tr]=Engel aşma servisini (zapret) açıp kapatın ve bağlantıyı test edin
+Exec=dpi-dashboard
+Icon=dpi-dashboard
+Terminal=false
+Categories=Network;
+Keywords=dpi;zapret;goodbyedpi;discord;censorship;bypass;dashboard;
+Keywords[tr]=dpi;zapret;goodbyedpi;discord;engel;sansür;dashboard;
+StartupWMClass=dpi-dashboard
