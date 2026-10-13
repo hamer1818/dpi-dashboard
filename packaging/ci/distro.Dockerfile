@@ -6,4 +6,4 @@ FROM ${IMAGE}
 ARG PREP
 RUN sh -c "$PREP"
 STOPSIGNAL SIGRTMIN+3
-CMD ["/sbin/init"]
+CMD ["/usr/lib/systemd/systemd"]

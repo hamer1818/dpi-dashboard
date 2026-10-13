@@ -78,7 +78,7 @@ jobs:
             prep: pacman -Syu --noconfirm systemd python && pacman -Scc --noconfirm
           - name: opensuse-tumbleweed
             image: opensuse/tumbleweed:latest
-            prep: zypper -n install systemd systemd-sysvinit python3 && zypper clean -a
+            prep: zypper -n install systemd python3 && zypper clean -a
     name: distro (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
