@@ -44,7 +44,39 @@ the command line. DPI Dashboard is a front end for that service.
 If you have none of these, use [Setup](#setup). If your service has a different name, set
 it in the [settings file](#settings).
 
-Not supported: Linux systems without systemd (OpenRC, runit, s6), macOS, Windows on ARM.
+### Supported systems
+
+**Tested automatically on every change** (a real install, retune and removal, see
+[Setup integration](.github/workflows/setup-integration.yml)):
+
+| System | Notes |
+|---|---|
+| Windows (CI: Windows Server, the Windows 10/11 code base) | through the same UAC path users take; also tested by hand on Windows 10 |
+| Ubuntu (current LTS) | |
+| Debian 12 | setup installed missing `curl` and `nftables` |
+| Fedora (latest) | setup installed missing `nftables` |
+| Arch Linux | |
+| openSUSE Tumbleweed | setup installed missing `gawk` and `nftables` |
+
+**Expected to work, not tested:** distributions built on the ones above with systemd and
+Python 3.10 or newer, for example Linux Mint 21+, Pop!_OS 22.04+, Zorin OS 17+,
+elementary OS 7+, Manjaro, EndeavourOS, CachyOS, Garuda, Nobara, Ubuntu 22.04.
+On Fedora/RHEL-like systems with SELinux enforcing, setup relabels `/opt/zapret`
+(`restorecon`); this cannot be tested in CI, which runs without SELinux. Please report
+the result if you use one.
+
+**Not supported:**
+
+| System | Why |
+|---|---|
+| No systemd: Alpine, Void, Gentoo with OpenRC, Artix, Devuan, antiX | the Linux backend and setup use systemd |
+| Python older than 3.10: Debian 11, Ubuntu 20.04, openSUSE Leap 15, RHEL/Alma/Rocky 8–9 with the default Python | the install script stops and says so |
+| NixOS | system files are managed by Nix; install zapret through Nix, then the on/off switch works |
+| Immutable systems: Fedora Silverblue/Kinoite/Bazzite, SteamOS, openSUSE Aeon/MicroOS | setup cannot install packages there; the on/off switch works if zapret is installed another way |
+| WSL, macOS, Windows on ARM | no bypass service to control (WinDivert has no ARM driver) |
+
+Window managers without a desktop environment (i3, Sway, Hyprland, bspwm…) need a polkit
+authentication agent running, otherwise the password prompt never appears.
 
 ## Install
 

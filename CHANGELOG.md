@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2
+
+- Setup works on minimal Linux installs: it no longer needs `pgrep` (missing on
+  Fedora and Debian containers, where every strategy looked like it failed to start)
+  and installs `gawk` when `awk` is missing (openSUSE).
+- Fedora/RHEL: `/opt/zapret` is relabelled with `restorecon` when SELinux is enabled.
+- CI runs the full setup on Debian 12, Fedora, Arch Linux and openSUSE Tumbleweed in
+  addition to Ubuntu and Windows.
+- README: which systems are tested, expected to work, or not supported, and why.
+
 ## 0.2.1
 
 - Windows: Setup failed right after the download without asking for administrator

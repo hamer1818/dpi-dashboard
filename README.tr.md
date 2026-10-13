@@ -44,8 +44,39 @@ Dashboard o servisin arayüzüdür.
 Bunlardan hiçbiri yoksa [Kurulum](#kurulum-düğmesi)'u kullanın. Servisinizin adı farklıysa
 [ayar dosyasına](#ayarlar) yazın.
 
-Desteklenmeyenler: systemd kullanmayan Linux sistemleri (OpenRC, runit, s6), macOS, ARM
-işlemcili Windows.
+### Desteklenen sistemler
+
+**Her değişiklikte otomatik test edilenler** (gerçek kurulum, yeniden ayarlama ve kaldırma,
+bkz. [Setup integration](.github/workflows/setup-integration.yml)):
+
+| Sistem | Not |
+|---|---|
+| Windows (CI: Windows Server, Windows 10/11 ile aynı temel) | kullanıcıların izlediği UAC yolundan; Windows 10'da elle de denendi |
+| Ubuntu (güncel LTS) | |
+| Debian 12 | kurulum eksik `curl` ve `nftables`'ı kurdu |
+| Fedora (güncel) | kurulum eksik `nftables`'ı kurdu |
+| Arch Linux | |
+| openSUSE Tumbleweed | kurulum eksik `gawk` ve `nftables`'ı kurdu |
+
+**Çalışması beklenen, test edilmeyenler:** yukarıdakilerin üzerine kurulu, systemd ve
+Python 3.10+ kullanan dağıtımlar; örneğin Linux Mint 21+, Pop!_OS 22.04+, Zorin OS 17+,
+elementary OS 7+, Manjaro, EndeavourOS, CachyOS, Garuda, Nobara, Ubuntu 22.04.
+SELinux'un zorunlu olduğu Fedora/RHEL benzeri sistemlerde kurulum `/opt/zapret`'i yeniden
+etiketler (`restorecon`); CI SELinux'suz çalıştığı için bu test edilemiyor. Kullanıyorsanız
+sonucu bildirin.
+
+**Desteklenmeyenler:**
+
+| Sistem | Neden |
+|---|---|
+| systemd'siz: Alpine, Void, OpenRC'li Gentoo, Artix, Devuan, antiX | Linux tarafı ve kurulum systemd kullanır |
+| Python 3.10'dan eski: Debian 11, Ubuntu 20.04, openSUSE Leap 15, varsayılan Python'lu RHEL/Alma/Rocky 8–9 | kurulum betiği durur ve nedenini söyler |
+| NixOS | sistem dosyalarını Nix yönetir; zapret'i Nix ile kurun, açma-kapama çalışır |
+| Değiştirilemez sistemler: Fedora Silverblue/Kinoite/Bazzite, SteamOS, openSUSE Aeon/MicroOS | kurulum oraya paket kuramaz; zapret başka yoldan kurulursa açma-kapama çalışır |
+| WSL, macOS, ARM işlemcili Windows | yönetilecek engel aşma servisi yok (WinDivert'in ARM sürücüsü yok) |
+
+Masaüstü ortamı olmayan pencere yöneticilerinde (i3, Sway, Hyprland, bspwm…) çalışan bir
+polkit kimlik doğrulama ajanı gerekir, yoksa şifre penceresi hiç açılmaz.
 
 ## Kurulum
 
