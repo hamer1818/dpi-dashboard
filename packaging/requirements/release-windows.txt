@@ -8,10 +8,6 @@ packaging==26.3 \
     # via
     #   pyinstaller
     #   pyinstaller-hooks-contrib
-pefile==2024.8.26 \
-    --hash=sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632 \
-    --hash=sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f
-    # via pyinstaller
 pyinstaller==6.22.3 \
     --hash=sha256:020d4fe0627f5c73dfbcfad1a6578ef354d5fe4bdccd9d8e5a615528f5a45d2b \
     --hash=sha256:052f4a1cd4f81092ccb7a18fe8ebc9ecf832a5917317e39fb3775af4e959b253 \
@@ -25,7 +21,7 @@ pyinstaller==6.22.3 \
     --hash=sha256:a2b6fc26601e8c2596c3d54981566934a3382e85d05d0fe91b55b6a8dcc6b282 \
     --hash=sha256:ea240b5dfa831ff673c97505eee0ec24670bccf71396c83109440348944c83d0 \
     --hash=sha256:f82d0fb89f21c3ed6f482ee16f341bc59e8a31dbabb9bae9ef04e53ade4dc0d9
-    # via -r packaging/requirements/release-windows.in
+    # via -r release-windows.in
 pyinstaller-hooks-contrib==2026.8 \
     --hash=sha256:4d825786ad7a9b7dbcc52d612748a34562fe273461bcfd88f4d549c594bbf8f9 \
     --hash=sha256:6d21d65323ea4467753afc21f52d7d0e69416ae8101dd88269bf273ad48db084
@@ -37,7 +33,7 @@ pyqt6==6.11.0 \
     --hash=sha256:b6324e3501b19b4292c7a55b1f22e82d3e80e519e383ce4fe79b4a754c6f0288 \
     --hash=sha256:bd11b459c54dca068e988a42cf838303334f0d441b9d16d92ae6719fcb5ac6ba \
     --hash=sha256:f7100bc7f72b12581ec479a733f4ad11b8002668e6786e8a445ab6f4d1c743d4
-    # via -r packaging/requirements/release-windows.in
+    # via -r release-windows.in
 pyqt6-qt6==6.11.2 \
     --hash=sha256:2c38ee8b797c0d7f327afef4cfbb97c73676954ef2d1d503779d62c982bf5a66 \
     --hash=sha256:4b424ed1babbef07133eb2a4174c56c848d518767bca8e759aca2c8c9c313636 \
@@ -78,11 +74,3 @@ pyqt6-sip==13.13.0 \
     --hash=sha256:fe966368ecd09319d7b6df31cb3dc484128e2b36177fb814faa5b8b7e6525b37 \
     --hash=sha256:ff5d5bd3920d1e2bc251a931233c7909df08fa12786c2ddbcef935b6105bfb0c
     # via pyqt6
-pywin32-ctypes==0.2.3 \
-    --hash=sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8 \
-    --hash=sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755
-    # via pyinstaller
-setuptools==84.0.0 \
-    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670 \
-    --hash=sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73
-    # via pyinstaller
