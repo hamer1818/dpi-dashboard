@@ -8,7 +8,6 @@ from html import escape
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -55,9 +54,7 @@ class SetupDialog(QDialog):
         title.setFont(f)
         self.summary = QLabel(tr("setup_checking"))
         self.summary.setWordWrap(True)
-        self.dns_box = QCheckBox(tr("setup_dns_option_windows" if sys.platform == "win32"
-                                    else "setup_dns_option"))
-        self.dns_box.setVisible(False)
+        self.dns_auto = False       # install / retune also switches to encrypted DNS
 
         self.primary = QPushButton()
         self.primary.setMinimumHeight(36)
@@ -83,7 +80,6 @@ class SetupDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(title)
         lay.addWidget(self.summary)
-        lay.addWidget(self.dns_box)
         lay.addLayout(buttons)
         lay.addWidget(self.bar)
         lay.addWidget(self.log)
@@ -130,11 +126,11 @@ class SetupDialog(QDialog):
             lines.append(tr("setup_dns_windows_hint"))
         self.summary.setText("<br>".join(lines))
 
-        show_dns = (st.can_install or st.can_tune) and (
+        # Whoever installs a DPI bypass also wants DNS that is not forged, so it is part of
+        # the setup (and listed in the confirmation). Linux: only with systemd-resolved.
+        self.dns_auto = (st.can_install or st.can_tune) and (
             st.platform == "windows"
             or (st.platform == "linux" and st.resolved_active and not st.dot_active))
-        self.dns_box.setVisible(show_dns)
-        self.dns_box.setChecked(show_dns and bool(st.dns) and st.dns.state == "mismatch")
         self.remove.setVisible(st.managed)
         if st.can_install:
             self.primary.setText(tr("setup_install"))
@@ -151,9 +147,14 @@ class SetupDialog(QDialog):
     # --- actions -----------------------------------------------------------------------
 
     def confirm(self, key: str) -> bool:
+        dns = ""
+        if self.dns_auto and key != "setup_confirm_remove":
+            sep = "\n" if key == "setup_confirm_install" else "\n\n"
+            dns = sep + self.tr("setup_dns_windows" if self.status.platform == "windows"
+                                else "setup_dns_linux")
         box = QMessageBox(QMessageBox.Icon.Question, self.tr("setup_title"),
                           self.tr(key, tries=str(len(self.cfg.strategies)),
-                                  path=self.install_path()),
+                                  path=self.install_path(), dns=dns),
                           QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, self)
         return box.exec() == QMessageBox.StandardButton.Yes
 
@@ -181,7 +182,7 @@ class SetupDialog(QDialog):
         try:
             inv = runner.build(mode, strategies=self.cfg.strategies, hosts=self.cfg.hosts,
                                tries=self.cfg.tries,
-                               dns_dot=self.dns_box.isVisible() and self.dns_box.isChecked())
+                               dns_dot=self.dns_auto and mode != "uninstall")
         except ValueError as e:
             self.finish(False, self.tr("error", msg=str(e)))
             return
@@ -241,7 +242,6 @@ class SetupDialog(QDialog):
     def begin(self):
         self.primary.setEnabled(False)
         self.remove.setEnabled(False)
-        self.dns_box.setEnabled(False)
         self.bar.setVisible(True)
         self.log.clear()
 
@@ -249,7 +249,6 @@ class SetupDialog(QDialog):
         self.result_ok = ok
         self.bar.setVisible(False)
         self.remove.setEnabled(True)
-        self.dns_box.setEnabled(True)
         self.say(message, GREEN if ok else RED)
         self.changed.emit()
         self.recheck()

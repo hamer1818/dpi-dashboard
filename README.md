@@ -151,10 +151,11 @@ voice over UDP (STUN and IP discovery, ports 19294-19344 and 50000-50100), QUIC 
 443) and Cloudflare's extra TLS ports (2053, 2083, 2087, 2096, 8443). Only the HTTPS part
 is tuned. If even the best strategy misses some test sites, setup says so.
 
-Setup can also switch to encrypted DNS, pre-selected when DNS answers look forged: on
-Linux with systemd-resolved, DNS-over-TLS; on Windows, Cloudflare DNS (1.1.1.1) on the
-connected network adapters, with DNS over HTTPS on Windows 11 (Windows 10 has none, so
-there it is plain DNS to Cloudflare). **Remove** puts the previous DNS servers back.
+Setup also switches to DNS that the provider cannot forge, and says so in the
+confirmation: on Linux with systemd-resolved, DNS-over-TLS; on Windows, Cloudflare DNS
+(1.1.1.1) on the connected network adapters, with DNS over HTTPS on Windows 11 (Windows
+10 has none, so there it is plain DNS to Cloudflare). **Remove** puts the previous DNS
+servers back. From the command line this is opt-in (`--dns-dot`).
 
 The strategies tried, in order, are listed in
 [`setup/strategies.py`](src/dpi_dashboard/setup/strategies.py); put your own in the

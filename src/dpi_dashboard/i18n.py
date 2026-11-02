@@ -45,9 +45,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "close": "Close",
         "setup_title": "Setup and repair",
         "setup_checking": "Checking this computer…",
-        "setup_dns_option": "Also turn on encrypted DNS (DNS-over-TLS in systemd-resolved)",
-        "setup_dns_option_windows": "Also switch DNS to Cloudflare 1.1.1.1 (encrypted on "
-                                    "Windows 11; “Remove” restores the previous servers)",
+        "setup_dns_linux": "• turn on encrypted DNS (DNS-over-TLS to Quad9 and Cloudflare in "
+                           "systemd-resolved), so DNS answers cannot be forged.",
+        "setup_dns_windows": "• switch the DNS of your network connections to Cloudflare "
+                             "1.1.1.1 (encrypted on Windows 11), so DNS answers cannot be "
+                             "forged. “Remove” restores the previous servers.",
         "setup_remove": "Remove",
         "setup_service_found": "Service “{service}” is installed.",
         "setup_service_missing": "Service “{service}” is not installed.",
@@ -72,13 +74,13 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "• download the latest zapret release from "
                                  "github.com/bol-van/zapret and verify its checksums,\n"
                                  "• install it to {path} as a system service,\n"
-                                 "• try up to {tries} settings and keep the best one.\n\n"
+                                 "• try up to {tries} settings and keep the best one.{dns}\n\n"
                                  "The administrator password is asked once. Web connections may "
                                  "drop for a few seconds while settings are tried. “Remove” "
                                  "undoes all of it.\n\nContinue?",
         "setup_confirm_tune": "DPI Dashboard will try up to {tries} settings on the installed "
                               "zapret and keep the best one. If none of them works, the current "
-                              "settings are put back.\n\nThe administrator password is asked "
+                              "settings are put back.{dns}\n\nThe administrator password is asked "
                               "once. Web connections may drop for a few seconds.\n\nContinue?",
         "setup_confirm_remove": "Stop and delete the zapret service and remove {path}?",
         "setup_download_failed": "Download failed: {msg}",
@@ -101,8 +103,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "warn_dns-no-doh": "This Windows version has no DNS over HTTPS; Cloudflare DNS is used "
                            "unencrypted.",
         "warn_dns-failed": "DNS could not be changed; see the messages above.",
-        "warn_partial": "Some test sites are still unreachable with the best setting. Check "
-                        "the DNS option and run “Find the best setting again”.",
+        "warn_partial": "Some test sites are still unreachable with the best setting. Try "
+                        "“Find the best setting again” later.",
         "setup_success": "Done. zapret is on and starts at boot. Restart Discord completely "
                          "(also from the system tray) so it reconnects.",
         "setup_removed": "zapret was removed.",
@@ -149,9 +151,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "close": "Kapat",
         "setup_title": "Kurulum ve onarım",
         "setup_checking": "Bilgisayar kontrol ediliyor…",
-        "setup_dns_option": "Şifreli DNS'i de aç (systemd-resolved'da DNS-over-TLS)",
-        "setup_dns_option_windows": "DNS'i de Cloudflare 1.1.1.1 yap (Windows 11'de şifreli; "
-                                    "“Kaldır” önceki sunucuları geri koyar)",
+        "setup_dns_linux": "• DNS cevapları sahtelenemesin diye şifreli DNS'i açacak "
+                           "(systemd-resolved'da Quad9 ve Cloudflare'e DNS-over-TLS).",
+        "setup_dns_windows": "• DNS cevapları sahtelenemesin diye ağ bağlantılarınızın DNS'ini "
+                             "Cloudflare 1.1.1.1 yapacak (Windows 11'de şifreli). “Kaldır” "
+                             "önceki sunucuları geri koyar.",
         "setup_remove": "Kaldır",
         "setup_service_found": "“{service}” servisi kurulu.",
         "setup_service_missing": "“{service}” servisi kurulu değil.",
@@ -174,13 +178,13 @@ STRINGS: dict[str, dict[str, str]] = {
                                  "• github.com/bol-van/zapret'ten son zapret sürümünü indirip "
                                  "özetlerini doğrulayacak,\n"
                                  "• {path} konumuna sistem servisi olarak kuracak,\n"
-                                 "• en fazla {tries} ayar deneyip en iyisini bırakacak.\n\n"
+                                 "• en fazla {tries} ayar deneyip en iyisini bırakacak.{dns}\n\n"
                                  "Yönetici şifresi bir kez sorulur. Ayarlar denenirken web "
                                  "bağlantıları birkaç saniye kopabilir. “Kaldır” hepsini geri "
                                  "alır.\n\nDevam edilsin mi?",
         "setup_confirm_tune": "DPI Dashboard kurulu zapret üzerinde en fazla {tries} ayar deneyip "
                               "en iyisini bırakacak. Hiçbiri işe yaramazsa mevcut ayarlar geri "
-                              "konur.\n\nYönetici şifresi bir kez sorulur. Web bağlantıları "
+                              "konur.{dns}\n\nYönetici şifresi bir kez sorulur. Web bağlantıları "
                               "birkaç saniye kopabilir.\n\nDevam edilsin mi?",
         "setup_confirm_remove": "zapret servisi durdurulup silinsin ve {path} kaldırılsın mı?",
         "setup_download_failed": "İndirme başarısız: {msg}",
@@ -203,8 +207,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "warn_dns-no-doh": "Bu Windows sürümünde DNS over HTTPS yok; Cloudflare DNS şifresiz "
                            "kullanılıyor.",
         "warn_dns-failed": "DNS değiştirilemedi; yukarıdaki mesajlara bakın.",
-        "warn_partial": "En iyi ayarla bile bazı test sitelerine ulaşılamıyor. DNS seçeneğini "
-                        "işaretleyip “En iyi ayarı yeniden bul”u çalıştırın.",
+        "warn_partial": "En iyi ayarla bile bazı test sitelerine ulaşılamıyor. Bir süre sonra "
+                        "“En iyi ayarı yeniden bul”u tekrar deneyin.",
         "setup_success": "Tamam. zapret açık ve açılışta başlıyor. Discord'u tamamen kapatıp "
                          "(sistem tepsisinden de) yeniden açın.",
         "setup_removed": "zapret kaldırıldı.",

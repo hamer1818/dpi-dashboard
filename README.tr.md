@@ -139,11 +139,11 @@ portları), QUIC (UDP 443) ve Cloudflare'in ek TLS portları (2053, 2083, 2087, 
 Sadece HTTPS kısmı ayarlanır. En iyi strateji bile bazı test sitelerine ulaşamıyorsa
 kurulum bunu söyler.
 
-Kurulum şifreli DNS'e de geçebilir; DNS cevapları sahte görünürse bu seçenek işaretli
-gelir: systemd-resolved kullanan Linux'larda DNS-over-TLS, Windows'ta bağlı ağ
+Kurulum, sağlayıcının sahteleyemeyeceği bir DNS'e de geçer ve bunu onay penceresinde
+söyler: systemd-resolved kullanan Linux'larda DNS-over-TLS, Windows'ta bağlı ağ
 bağdaştırıcılarında Cloudflare DNS (1.1.1.1), Windows 11'de DNS over HTTPS ile (Windows
 10'da bu yok, orada Cloudflare'e şifresiz DNS kullanılır). **Kaldır** önceki DNS
-sunucularını geri koyar.
+sunucularını geri koyar. Komut satırında bu isteğe bağlıdır (`--dns-dot`).
 
 Denenen stratejiler sırasıyla
 [`setup/strategies.py`](src/dpi_dashboard/setup/strategies.py)'de. Kendi stratejilerinizi

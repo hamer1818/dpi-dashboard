@@ -6,10 +6,11 @@
   It now also covers Discord voice over UDP (STUN and IP discovery, 19294-19344 and
   50000-50100), QUIC (UDP 443) and Cloudflare's extra TLS ports (2053, 2083, 2087, 2096,
   8443), on Windows and Linux.
-- Windows: setup can switch the connected adapters to Cloudflare DNS (DNS over HTTPS on
-  Windows 11). The option is pre-selected when DNS answers look forged. Remove restores
-  the previous servers. Before, Windows only showed how to change DNS by hand, which
-  does not apply to Windows 10.
+- Setup in the window now always switches to DNS that cannot be forged, listed in the
+  confirmation (the checkbox is gone; the command line keeps `--dns-dot`). Windows:
+  Cloudflare DNS on the connected adapters, DNS over HTTPS on Windows 11; Remove
+  restores the previous servers. Before, Windows only showed how to change DNS by hand,
+  which does not apply to Windows 10. Linux: DNS-over-TLS in systemd-resolved, as before.
 - Setup warns when even the best strategy misses some test sites, instead of reporting
   plain success.
 - More Discord test sites (`media.discordapp.net`, `updates.discord.com`); settings files

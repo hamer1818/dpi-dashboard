@@ -27,7 +27,7 @@ def test_fresh_linux_offers_install(app):
                                      dns=status.DnsCheck("discord.com", "mismatch")))
     assert d.primary.isEnabled() and d.primary.text().startswith("Install")
     assert not d.remove.isVisibleTo(d)
-    assert d.dns_box.isVisibleTo(d) and d.dns_box.isChecked()   # DNS looked forged
+    assert d.dns_auto                    # systemd-resolved without DNS-over-TLS yet
     assert "curl" in d.summary.text() and "falsifying" in d.summary.text()
 
 
@@ -36,7 +36,7 @@ def test_package_install_offers_tune_not_remove(app):
     d.show_status(status.SetupStatus("linux", service="zapret.service", service_found=True,
                                      files_present=True, dns=status.DnsCheck("x", "ok")))
     assert d.primary.text().startswith("Find") and d.primary.isEnabled()
-    assert not d.remove.isVisibleTo(d) and not d.dns_box.isChecked()
+    assert not d.remove.isVisibleTo(d) and not d.dns_auto   # no systemd-resolved
 
 
 def test_foreign_windows_service_is_left_alone(app):
@@ -78,13 +78,24 @@ def test_dns_option_hidden_when_already_encrypted(app):
     d = dialog()
     d.show_status(status.SetupStatus("linux", service_found=True, files_present=True,
                                      resolved_active=True, dot_active=True))
-    assert not d.dns_box.isVisibleTo(d)
+    assert not d.dns_auto
 
 
-def test_windows_offers_dns_when_it_looks_forged(app):
+def test_windows_setup_always_switches_dns(app):
     d = dialog()
-    d.show_status(status.SetupStatus("windows",
-                                     dns=status.DnsCheck("discord.com", state="mismatch")))
-    assert d.dns_box.isVisibleTo(d) and d.dns_box.isChecked()
     d.show_status(status.SetupStatus("windows", dns=status.DnsCheck("discord.com", state="ok")))
-    assert d.dns_box.isVisibleTo(d) and not d.dns_box.isChecked()
+    assert d.dns_auto and d.primary.isEnabled()
+    d.show_status(status.SetupStatus("windows", service="GoodbyeDPI", service_found=True))
+    assert not d.dns_auto                # nothing to install or retune
+
+
+def test_confirmation_lists_the_dns_change(app, monkeypatch):
+    d = dialog()
+    d.show_status(status.SetupStatus("windows"))
+    shown = []
+    monkeypatch.setattr("dpi_dashboard.setup_dialog.QMessageBox.exec",
+                        lambda box: shown.append(box.text()) or 0)
+    d.confirm("setup_confirm_install")
+    d.confirm("setup_confirm_remove")
+    assert "Cloudflare 1.1.1.1" in shown[0] and "{dns}" not in shown[0]
+    assert "Cloudflare" not in shown[1]
