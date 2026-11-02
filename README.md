@@ -146,8 +146,15 @@ Dashboard installed: a zapret from a distribution package or another installer i
 never deleted. On Windows, a service installed by another tool is only turned on and
 off, never reconfigured.
 
-On Linux with systemd-resolved, setup can also turn on encrypted DNS (DNS-over-TLS) when
-DNS answers look forged. On Windows it shows how to turn on DNS over HTTPS instead.
+Besides HTTPS on port 443, the service also covers what the Discord app needs: Discord
+voice over UDP (STUN and IP discovery, ports 19294-19344 and 50000-50100), QUIC (UDP
+443) and Cloudflare's extra TLS ports (2053, 2083, 2087, 2096, 8443). Only the HTTPS part
+is tuned. If even the best strategy misses some test sites, setup says so.
+
+Setup can also switch to encrypted DNS, pre-selected when DNS answers look forged: on
+Linux with systemd-resolved, DNS-over-TLS; on Windows, Cloudflare DNS (1.1.1.1) on the
+connected network adapters, with DNS over HTTPS on Windows 11 (Windows 10 has none, so
+there it is plain DNS to Cloudflare). **Remove** puts the previous DNS servers back.
 
 The strategies tried, in order, are listed in
 [`setup/strategies.py`](src/dpi_dashboard/setup/strategies.py); put your own in the

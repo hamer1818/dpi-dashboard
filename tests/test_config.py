@@ -40,3 +40,10 @@ def test_broken_json(tmp_path):
 def test_ensure_file_writes_defaults(tmp_path):
     p = config.ensure_file(tmp_path / "sub" / "config.json")
     assert json.loads(p.read_text(encoding="utf-8"))["hosts"] == config.DEFAULT_HOSTS
+
+
+def test_old_default_hosts_are_upgraded(tmp_path):
+    cfg, warn = config.load(write(tmp_path, json.dumps({"hosts": config.OLD_DEFAULT_HOSTS[0]})))
+    assert cfg.hosts == config.DEFAULT_HOSTS and not warn
+    cfg, _ = config.load(write(tmp_path, json.dumps({"hosts": ["example.com"]})))
+    assert cfg.hosts == ["example.com"]

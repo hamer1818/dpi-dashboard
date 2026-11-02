@@ -113,3 +113,18 @@ def test_logging_does_not_leak_into_return_values(tmp_path):
     r = subprocess.run([SHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
                        capture_output=True, text=True)
     assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+
+
+@needs_ps
+def test_service_command_covers_discord_voice_and_quic(tmp_path):
+    text = HELPER.read_text(encoding="utf-8")
+    part = text[text.index("# Discord needs"):text.index("# --- download and verification")]
+    script = tmp_path / "image.ps1"
+    script.write_text("$Dest = 'C:\\zapret'\n" + part + "ImagePath '--dpi-desync=multisplit'\n")
+    r = subprocess.run([SHELL, "-NoProfile", "-File", str(script)], capture_output=True, text=True)
+    cmd = r.stdout.strip()
+    assert r.returncode == 0 and cmd.startswith('"C:\\zapret\\winws.exe" '), r.stdout + r.stderr
+    assert "--wf-tcp=80,443,2053,2083,2087,2096,8443 --wf-udp=443,19294-19344,50000-50100" in cmd
+    assert "--filter-udp=443 --filter-l7=quic --dpi-desync=fake" in cmd
+    assert "--filter-udp=19294-19344,50000-50100 --filter-l7=discord,stun" in cmd
+    assert cmd.endswith("--filter-tcp=443,2053,2083,2087,2096,8443 --dpi-desync=multisplit")

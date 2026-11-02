@@ -46,6 +46,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_title": "Setup and repair",
         "setup_checking": "Checking this computer…",
         "setup_dns_option": "Also turn on encrypted DNS (DNS-over-TLS in systemd-resolved)",
+        "setup_dns_option_windows": "Also switch DNS to Cloudflare 1.1.1.1 (encrypted on "
+                                    "Windows 11; “Remove” restores the previous servers)",
         "setup_remove": "Remove",
         "setup_service_found": "Service “{service}” is installed.",
         "setup_service_missing": "Service “{service}” is not installed.",
@@ -95,7 +97,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_try_fail": "Setting {n}: zapret did not start",
         "setup_chosen": "Chosen: setting {n} ({score}).",
         "warn_dns-no-resolved": "systemd-resolved is not running; encrypted DNS was not set up.",
-        "setup_success": "Done. zapret is on and starts at boot.",
+        "warn_dns-no-adapter": "No connected network adapter found; DNS was not changed.",
+        "warn_dns-no-doh": "This Windows version has no DNS over HTTPS; Cloudflare DNS is used "
+                           "unencrypted.",
+        "warn_dns-failed": "DNS could not be changed; see the messages above.",
+        "warn_partial": "Some test sites are still unreachable with the best setting. Check "
+                        "the DNS option and run “Find the best setting again”.",
+        "setup_success": "Done. zapret is on and starts at boot. Restart Discord completely "
+                         "(also from the system tray) so it reconnects.",
         "setup_removed": "zapret was removed.",
         "setup_failed": "Setup did not finish. See the messages above.",
         "setup_no_output": "The administrator step ended without any message (exit code {code}). "
@@ -141,6 +150,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_title": "Kurulum ve onarım",
         "setup_checking": "Bilgisayar kontrol ediliyor…",
         "setup_dns_option": "Şifreli DNS'i de aç (systemd-resolved'da DNS-over-TLS)",
+        "setup_dns_option_windows": "DNS'i de Cloudflare 1.1.1.1 yap (Windows 11'de şifreli; "
+                                    "“Kaldır” önceki sunucuları geri koyar)",
         "setup_remove": "Kaldır",
         "setup_service_found": "“{service}” servisi kurulu.",
         "setup_service_missing": "“{service}” servisi kurulu değil.",
@@ -188,7 +199,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "setup_try_fail": "Ayar {n}: zapret başlamadı",
         "setup_chosen": "Seçilen: ayar {n} ({score}).",
         "warn_dns-no-resolved": "systemd-resolved çalışmıyor; şifreli DNS kurulmadı.",
-        "setup_success": "Tamam. zapret açık ve açılışta başlıyor.",
+        "warn_dns-no-adapter": "Bağlı ağ bağdaştırıcısı bulunamadı; DNS değiştirilmedi.",
+        "warn_dns-no-doh": "Bu Windows sürümünde DNS over HTTPS yok; Cloudflare DNS şifresiz "
+                           "kullanılıyor.",
+        "warn_dns-failed": "DNS değiştirilemedi; yukarıdaki mesajlara bakın.",
+        "warn_partial": "En iyi ayarla bile bazı test sitelerine ulaşılamıyor. DNS seçeneğini "
+                        "işaretleyip “En iyi ayarı yeniden bul”u çalıştırın.",
+        "setup_success": "Tamam. zapret açık ve açılışta başlıyor. Discord'u tamamen kapatıp "
+                         "(sistem tepsisinden de) yeniden açın.",
         "setup_removed": "zapret kaldırıldı.",
         "setup_failed": "Kurulum tamamlanmadı. Yukarıdaki mesajlara bakın.",
         "setup_no_output": "Yönetici adımı hiçbir mesaj vermeden bitti (çıkış kodu {code}). "

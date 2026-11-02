@@ -7,6 +7,7 @@
 #     %ProgramData%\dpi-dashboard\logs\<LogName>.log
 #
 #   -Mode install|tune|uninstall -LogName NAME [-Strategies "s1|s2"] [-Hosts a,b] [-Tries N]
+#   [-Dns 1]
 #
 # install: downloads the latest bol-van/zapret release, checks the archive against the
 #          SHA-256 published by GitHub and each program against upstream's sha256sum.txt,
@@ -15,10 +16,12 @@
 # tune:    measures the blocking with the service stopped, tries each strategy until one
 #          reaches every test site, keeps the best and sets the service to start
 #          automatically. Only the service installed by DPI Dashboard is changed.
+#          -Dns 1 also points the connected network adapters at Cloudflare DNS (encrypted
+#          where Windows supports it); the previous servers are restored by uninstall.
 # Parameters are plain strings on purpose: everything is validated after the log is open,
 # so even a bad argument ends up as a message in the window.
 param([string]$Mode = '', [string]$LogName = '', [string]$Strategies = '',
-      [string]$Hosts = 'discord.com', [string]$Tries = '3')
+      [string]$Hosts = 'discord.com', [string]$Tries = '3', [string]$Dns = '0')
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'      # Invoke-WebRequest is very slow with it
@@ -27,6 +30,7 @@ $Base = Join-Path $env:ProgramData 'dpi-dashboard'
 $Dest = Join-Path $env:ProgramFiles 'zapret'
 $Svc = 'zapret'
 $Mark = Join-Path $Dest '.installed-by-dpi-dashboard'
+$DnsBackup = Join-Path $Dest 'dns-backup.json'
 $Reg = "HKLM:\SYSTEM\CurrentControlSet\Services\$Svc"
 $Api = 'https://api.github.com/repos/bol-van/zapret/releases/latest'
 $DownloadPrefix = 'https://github.com/bol-van/zapret/releases/download/'
@@ -91,6 +95,7 @@ $Log = Join-Path (Join-Path $Base 'logs') "$LogName.log"
 
 if ($Mode -notin @('install', 'tune', 'uninstall')) { Fail 'unknown mode' }
 if ($Tries -notmatch '^[1-9][0-9]?$') { Fail 'invalid tries' }
+if ($Dns -notin @('0', '1')) { Fail 'invalid dns' }
 $TriesN = [int]$Tries
 $HostList = @($Hosts.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 foreach ($h in $HostList) { if ($h -notmatch $SafeHost) { Fail 'invalid host' } }
@@ -98,8 +103,18 @@ $Max = $HostList.Count * $TriesN
 $List = @($Strategies.Split('|') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 foreach ($s in $List) { if ($s -notmatch $SafeStrategy) { Fail 'unsafe strategy' } }
 
+# Discord needs more than HTTPS on 443: voice runs over UDP (STUN and Discord's own IP
+# discovery packets, ports 19294-19344 and 50000-50100), some endpoints use Cloudflare's
+# extra TLS ports, and the app talks QUIC (UDP 443) to Cloudflare. Only the TCP part of
+# the profile is tuned; the UDP profiles are the ones the common zapret Discord presets use.
+$TlsPorts = '443,2053,2083,2087,2096,8443'
+$VoicePorts = '19294-19344,50000-50100'
 function ImagePath([string]$strategy) {
-    "`"$Dest\winws.exe`" --wf-tcp=80,443 --filter-tcp=80 --hostcase --new --filter-tcp=443 $strategy"
+    "`"$Dest\winws.exe`" --wf-tcp=80,$TlsPorts --wf-udp=443,$VoicePorts" +
+    " --filter-udp=443 --filter-l7=quic --dpi-desync=fake --dpi-desync-repeats=6 --new" +
+    " --filter-udp=$VoicePorts --filter-l7=discord,stun --dpi-desync=fake --dpi-desync-repeats=6 --new" +
+    " --filter-tcp=80 --hostcase --new" +
+    " --filter-tcp=$TlsPorts $strategy"
 }
 
 # --- download and verification -----------------------------------------------------------
@@ -235,12 +250,93 @@ function Start-Zapret {
     }
 }
 
+# --- DNS -------------------------------------------------------------------------------------
+# Providers that block by DNS answer with a wrong address, and no DPI bypass fixes that.
+# The static servers each connected adapter had (empty = from DHCP) are saved once, in the
+# administrators-only install folder, and put back by uninstall.
+$DnsV4 = @('1.1.1.1', '1.0.0.1')
+$DnsV6 = @('2606:4700:4700::1111', '2606:4700:4700::1001')
+$TcpipV4 = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'
+$TcpipV6 = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters\Interfaces'
+
+function Static-Dns([string]$root, [string]$guid) {
+    $v = (Get-ItemProperty -LiteralPath "$root\$guid" -Name NameServer -ErrorAction SilentlyContinue).NameServer
+    if ($v) { return [string]$v } else { return '' }
+}
+
+# One output object per saved adapter. (Windows PowerShell's ConvertFrom-Json writes an
+# array as a single object, so it is unrolled here.)
+function Read-DnsBackup {
+    if (-not (Test-Path -LiteralPath $DnsBackup)) { return }
+    $parsed = Get-Content -LiteralPath $DnsBackup -Raw | ConvertFrom-Json
+    foreach ($e in $parsed) { $e }
+}
+
+function Set-SecureDns {
+    Log '@@STEP dns'
+    $adapters = @(Get-NetIPConfiguration | Where-Object {
+        ($_.IPv4DefaultGateway -or $_.IPv6DefaultGateway) -and $_.NetAdapter.Status -eq 'Up' } |
+        ForEach-Object { $_.NetAdapter })
+    if ($adapters.Count -eq 0) { Log '@@WARN dns-no-adapter'; return }
+    $saved = @(Read-DnsBackup)
+    foreach ($a in $adapters) {
+        $guid = [string]$a.InterfaceGuid
+        if (-not ($saved | Where-Object { $_.guid -eq $guid })) {
+            $saved += [pscustomobject]@{ guid = $guid; v4 = (Static-Dns $TcpipV4 $guid); v6 = (Static-Dns $TcpipV6 $guid) }
+            Set-Content -LiteralPath $DnsBackup -Value (ConvertTo-Json -InputObject @($saved))
+        }
+        Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses $DnsV4
+        try { Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses $DnsV6 }
+        catch { Log "IPv6 DNS of $($a.Name) not changed: $($_.Exception.Message)" }
+        Log "DNS of $($a.Name): Cloudflare"
+    }
+    # Windows 11: DNS over HTTPS for these servers. Plain DNS to them is the fallback when
+    # HTTPS is unreachable. Windows 10 has no system-wide DNS over HTTPS.
+    if (Get-Command Set-DnsClientDohServerAddress -ErrorAction SilentlyContinue) {
+        foreach ($ip in $DnsV4 + $DnsV6) {
+            try {
+                if (Get-DnsClientDohServerAddress -ServerAddress $ip -ErrorAction SilentlyContinue) {
+                    Set-DnsClientDohServerAddress -ServerAddress $ip -AutoUpgrade $true -AllowFallbackToUdp $true | Out-Null
+                } else {
+                    Add-DnsClientDohServerAddress -ServerAddress $ip -DohTemplate 'https://cloudflare-dns.com/dns-query' `
+                        -AutoUpgrade $true -AllowFallbackToUdp $true | Out-Null
+                }
+            } catch { Log "DNS over HTTPS for ${ip}: $($_.Exception.Message)" }
+        }
+        Log 'DNS over HTTPS: on'
+    } else {
+        Log '@@WARN dns-no-doh'
+    }
+    Clear-DnsClientCache
+}
+
+# The DNS-over-HTTPS entries are left as they are: they only apply while an adapter uses
+# those servers.
+function Restore-Dns {
+    foreach ($s in @(Read-DnsBackup)) {
+        $a = Get-NetAdapter | Where-Object { [string]$_.InterfaceGuid -eq $s.guid } | Select-Object -First 1
+        if (-not $a) { continue }
+        try {
+            Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ResetServerAddresses
+            foreach ($old in [string]$s.v4, [string]$s.v6) {
+                $list = @($old -split '[,\s]+' | Where-Object { $_ })
+                if ($list.Count) { Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses $list }
+            }
+            Log "DNS of $($a.Name) restored"
+        } catch { Log "could not restore the DNS of $($a.Name): $($_.Exception.Message)" }
+    }
+    if (Test-Path -LiteralPath $DnsBackup) { Clear-DnsClientCache }
+}
+
 function Do-Tune {
     if (-not (Test-Path -LiteralPath $Mark)) { Fail 'the zapret service was not installed by DPI Dashboard' }
     if ($List.Count -eq 0) { Fail 'no strategies' }
     $old = (Get-ItemProperty -LiteralPath $Reg).ImagePath
     $oldStart = (Get-Service -Name $Svc).StartType
     $wasRunning = (Get-Service -Name $Svc).Status -eq 'Running'
+    if ($Dns -eq '1') {
+        try { Set-SecureDns } catch { Log "DNS: $($_.Exception.Message)"; Log '@@WARN dns-failed' }
+    }
 
     Log '@@STEP baseline'
     Stop-Zapret
@@ -270,6 +366,7 @@ function Do-Tune {
     Set-Service -Name $Svc -StartupType Automatic
     if (-not (Start-Zapret)) { Fail 'zapret did not start with the chosen strategy' }
     Log "@@CHOSEN $bi $best/$Max"
+    if ($best -lt $Max) { Log '@@WARN partial' }
     Log '@@DONE ok'
 }
 
@@ -308,6 +405,7 @@ function Do-Uninstall {
     Log '@@STEP remove'
     try { Stop-Zapret } catch { }
     & sc.exe delete $Svc | Out-Null
+    try { Restore-Dns } catch { Log "DNS: $($_.Exception.Message)" }
     # winws loads the WinDivert driver from its own folder; let it unload before deleting.
     & sc.exe stop WinDivert 2>&1 | Out-Null
     for ($i = 0; $i -lt 10 -and (Test-Path -LiteralPath $Dest); $i++) {

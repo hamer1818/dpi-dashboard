@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Discord works fully, not just partly.** The service only handled HTTPS on TCP 443.
+  It now also covers Discord voice over UDP (STUN and IP discovery, 19294-19344 and
+  50000-50100), QUIC (UDP 443) and Cloudflare's extra TLS ports (2053, 2083, 2087, 2096,
+  8443), on Windows and Linux.
+- Windows: setup can switch the connected adapters to Cloudflare DNS (DNS over HTTPS on
+  Windows 11). The option is pre-selected when DNS answers look forged. Remove restores
+  the previous servers. Before, Windows only showed how to change DNS by hand, which
+  does not apply to Windows 10.
+- Setup warns when even the best strategy misses some test sites, instead of reporting
+  plain success.
+- More Discord test sites (`media.discordapp.net`, `updates.discord.com`); settings files
+  that still have the old default list get the new one.
+
 ## 0.3.1
 
 - Licensing made explicit. The source code stays MIT. The Windows program contains PyQt6

@@ -133,9 +133,17 @@ Kurulum, yönetici şifresini bir kez sorarak şunları yapar:
 dağıtım paketinden ya da başka bir kurulumdan gelen zapret asla silinmez. Windows'ta başka
 bir araçla kurulmuş bir servis sadece açılıp kapatılır, ayarı değiştirilmez.
 
-systemd-resolved kullanan Linux'larda DNS cevapları sahte görünürse kurulum şifreli DNS'i
-(DNS-over-TLS) de açabilir. Windows'ta bunun yerine DNS over HTTPS'in nasıl açılacağını
-gösterir.
+Servis, 443 portundaki HTTPS'in yanında Discord uygulamasının ihtiyaç duyduklarını da
+kapsar: UDP üzerinden Discord sesi (STUN ve IP keşfi, 19294-19344 ve 50000-50100
+portları), QUIC (UDP 443) ve Cloudflare'in ek TLS portları (2053, 2083, 2087, 2096, 8443).
+Sadece HTTPS kısmı ayarlanır. En iyi strateji bile bazı test sitelerine ulaşamıyorsa
+kurulum bunu söyler.
+
+Kurulum şifreli DNS'e de geçebilir; DNS cevapları sahte görünürse bu seçenek işaretli
+gelir: systemd-resolved kullanan Linux'larda DNS-over-TLS, Windows'ta bağlı ağ
+bağdaştırıcılarında Cloudflare DNS (1.1.1.1), Windows 11'de DNS over HTTPS ile (Windows
+10'da bu yok, orada Cloudflare'e şifresiz DNS kullanılır). **Kaldır** önceki DNS
+sunucularını geri koyar.
 
 Denenen stratejiler sırasıyla
 [`setup/strategies.py`](src/dpi_dashboard/setup/strategies.py)'de. Kendi stratejilerinizi

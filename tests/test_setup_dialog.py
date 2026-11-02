@@ -79,3 +79,12 @@ def test_dns_option_hidden_when_already_encrypted(app):
     d.show_status(status.SetupStatus("linux", service_found=True, files_present=True,
                                      resolved_active=True, dot_active=True))
     assert not d.dns_box.isVisibleTo(d)
+
+
+def test_windows_offers_dns_when_it_looks_forged(app):
+    d = dialog()
+    d.show_status(status.SetupStatus("windows",
+                                     dns=status.DnsCheck("discord.com", state="mismatch")))
+    assert d.dns_box.isVisibleTo(d) and d.dns_box.isChecked()
+    d.show_status(status.SetupStatus("windows", dns=status.DnsCheck("discord.com", state="ok")))
+    assert d.dns_box.isVisibleTo(d) and not d.dns_box.isChecked()

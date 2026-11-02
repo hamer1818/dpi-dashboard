@@ -180,14 +180,26 @@ jobs:
       - name: The app's own backend controls the service
         run: |
           python -c "from dpi_dashboard.backends import detect_backend; b = detect_backend(); print(b.label, b.state()); s = b.state(); assert b.service == 'zapret' and s.installed and s.active and s.enabled"
-      - name: Retune an existing install
+      - name: Retune an existing install, with the DNS option
         run: |
-          python -m dpi_dashboard.setup tune --elevate none --tries 1
+          Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses | Out-String | Set-Content dns-before.txt
+          python -m dpi_dashboard.setup tune --elevate none --tries 1 --dns-dot
           if ($LASTEXITCODE -ne 0) { throw "tune failed: $LASTEXITCODE" }
+          $up = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' }
+          foreach ($c in $up) {
+            $s = (Get-DnsClientServerAddress -InterfaceIndex $c.InterfaceIndex -AddressFamily IPv4).ServerAddresses
+            Write-Host "$($c.InterfaceAlias): $s"
+            if ($s -notcontains '1.1.1.1') { throw "DNS of $($c.InterfaceAlias) was not changed" }
+          }
+          if (-not (Test-Path "$env:ProgramFiles\zapret\dns-backup.json")) { throw 'DNS backup missing' }
+          Resolve-DnsName discord.com -Type A
       - name: Uninstall
         run: |
           python -m dpi_dashboard.setup uninstall --elevate auto
           if ($LASTEXITCODE -ne 0) { throw "uninstall failed: $LASTEXITCODE" }
+          $after = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses | Out-String
+          Write-Host $after
+          if ($after.Trim() -ne (Get-Content dns-before.txt -Raw).Trim()) { Get-Content dns-before.txt; throw 'DNS was not restored' }
           if (Get-Service zapret -ErrorAction SilentlyContinue) { throw 'service still exists' }
           if (Test-Path "$env:ProgramFiles\zapret") { throw 'folder still exists' }
           if (Get-Process winws -ErrorAction SilentlyContinue) { throw 'winws still running' }

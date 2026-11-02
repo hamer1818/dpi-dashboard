@@ -13,7 +13,10 @@ from .setup.strategies import STRATEGIES, is_safe
 BACKENDS = ("auto", "systemd", "windows-service")
 LANGUAGES = ("auto", "en", "tr")
 DEFAULT_HOSTS = ["discord.com", "gateway.discord.gg", "cdn.discordapp.com",
-                 "discord.gg", "status.discord.com"]
+                 "media.discordapp.net", "discord.gg", "updates.discord.com"]
+# Written to config.json by earlier versions; replaced by the current defaults on load.
+OLD_DEFAULT_HOSTS = [["discord.com", "gateway.discord.gg", "cdn.discordapp.com",
+                      "discord.gg", "status.discord.com"]]
 
 
 @dataclass
@@ -57,6 +60,8 @@ def load(path: Path | None = None) -> tuple[Config, str | None]:
             cfg.service = v.strip() if v and v.strip() else None
         elif k == "hosts" and isinstance(v, list) and all(isinstance(h, str) for h in v):
             cfg.hosts = [h.strip() for h in v if h.strip()]
+            if cfg.hosts in OLD_DEFAULT_HOSTS:
+                cfg.hosts = list(DEFAULT_HOSTS)
         elif (k == "strategies" and isinstance(v, list) and v
               and all(isinstance(x, str) and is_safe(x.strip()) for x in v)):
             cfg.strategies = [x.strip() for x in v]

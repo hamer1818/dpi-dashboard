@@ -126,13 +126,18 @@ def _encode(script: str) -> str:
 
 def build(mode: str, *, strategies=(), hosts=(), tries: int = 3, dns_dot: bool = False,
           elevate: str = "auto", log_name: str | None = None) -> Invocation:
-    """elevate: "auto" (pkexec / UAC), "sudo" (Linux terminal) or "none" (already admin)."""
+    """elevate: "auto" (pkexec / UAC), "sudo" (Linux terminal) or "none" (already admin).
+
+    dns_dot: Linux: DNS-over-TLS in systemd-resolved; Windows: Cloudflare DNS on the
+    connected adapters (DNS over HTTPS on Windows 11).
+    """
     strategies = valid_strategies(strategies) if mode != "uninstall" else []
     if sys.platform == "win32":
         name = log_name or uuid.uuid4().hex
         enc = _encode(_windows_inner({"Mode": mode, "LogName": name,
                                       "Hosts": ",".join(hosts), "Tries": str(tries),
-                                      "Strategies": "|".join(strategies)}))
+                                      "Strategies": "|".join(strategies),
+                                      "Dns": "1" if dns_dot else "0"}))
         if elevate == "none":
             args = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                     "-EncodedCommand", enc]

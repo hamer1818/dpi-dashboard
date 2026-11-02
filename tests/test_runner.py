@@ -106,3 +106,10 @@ def test_elevated_windows_session_loads_only_system_modules(monkeypatch):
     assert "$env:PSModulePath =" in first and "GetFolderPath('System')" in first
     assert "$env:" not in first.split("$env:PSModulePath =", 1)[1]   # not from env vars
     assert inner.index("PSModulePath") < inner.index("New-Object")
+
+
+def test_windows_dns_option_reaches_the_helper(monkeypatch):
+    _, inner = windows_inner(monkeypatch, "install", dns_dot=True)
+    assert "-Dns '1'" in inner
+    _, inner = windows_inner(monkeypatch, "tune")
+    assert "-Dns '0'" in inner

@@ -55,7 +55,8 @@ class SetupDialog(QDialog):
         title.setFont(f)
         self.summary = QLabel(tr("setup_checking"))
         self.summary.setWordWrap(True)
-        self.dns_box = QCheckBox(tr("setup_dns_option"))
+        self.dns_box = QCheckBox(tr("setup_dns_option_windows" if sys.platform == "win32"
+                                    else "setup_dns_option"))
         self.dns_box.setVisible(False)
 
         self.primary = QPushButton()
@@ -124,12 +125,14 @@ class SetupDialog(QDialog):
                     if st.dns.error else ""
                 lines.append(f"<span style='color:{AMBER}'>?</span> "
                              f"{tr(key, host=st.dns.host)}{detail}")
-        if st.dns and st.dns.state == "mismatch" and st.platform == "windows":
+        if (st.dns and st.dns.state == "mismatch" and st.platform == "windows"
+                and not (st.can_install or st.can_tune)):
             lines.append(tr("setup_dns_windows_hint"))
         self.summary.setText("<br>".join(lines))
 
-        show_dns = (st.platform == "linux" and st.resolved_active and not st.dot_active
-                    and (st.can_install or st.can_tune))
+        show_dns = (st.can_install or st.can_tune) and (
+            st.platform == "windows"
+            or (st.platform == "linux" and st.resolved_active and not st.dot_active))
         self.dns_box.setVisible(show_dns)
         self.dns_box.setChecked(show_dns and bool(st.dns) and st.dns.state == "mismatch")
         self.remove.setVisible(st.managed)

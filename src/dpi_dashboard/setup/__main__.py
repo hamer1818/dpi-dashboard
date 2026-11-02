@@ -21,7 +21,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m dpi_dashboard.setup")
     ap.add_argument("mode", choices=["check", "install", "tune", "uninstall"])
     ap.add_argument("--elevate", choices=["auto", "sudo", "none"], default="auto")
-    ap.add_argument("--dns-dot", action="store_true", help="Linux: turn on DNS-over-TLS")
+    ap.add_argument("--dns-dot", action="store_true",
+                    help="encrypted DNS (Linux: DNS-over-TLS; Windows: Cloudflare DNS)")
     ap.add_argument("--tries", type=int, help="attempts per site (default from settings)")
     a = ap.parse_args(argv)
     cfg, warning = config.load()
