@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - **Discord works fully, not just partly.** The service only handled HTTPS on TCP 443.
   It now also covers Discord voice over UDP (STUN and IP discovery, 19294-19344 and
