@@ -93,7 +93,9 @@ def menu_shot(w, name):
     base = w.grab()
     menu = w.settings_btn.menu()
     w.sync_autostart = lambda: None
+    w.autostart_action.blockSignals(True)     # only the tick: never touch the real autostart
     w.autostart_action.setChecked(True)
+    w.autostart_action.blockSignals(False)
     menu.adjustSize()
     mp = menu.grab()
     pos = w.settings_btn.mapTo(w, QPoint(w.settings_btn.width() - mp.width(),
