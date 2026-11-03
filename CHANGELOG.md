@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.5.0
+## 0.5.1
+
+(0.5.0 was tagged but never released: its Windows DNS check failed in CI. Its changes
+are all here.)
 
 - **System tray.** The icon shows the state (green on, gray off, red missing); its menu
   turns the service on or off, runs the test, shows the window or quits. Closing the
