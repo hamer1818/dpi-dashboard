@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- README (English and Turkish) rewritten as step-by-step guides for Windows and Linux,
+  with new screenshots made from the real widgets (`scripts/screenshots.py`).
+- `uninstall-linux.sh` also removes the "Start when I log in" entry.
+
 ## 0.5.1
 
 (0.5.0 was tagged but never released: its Windows DNS check failed in CI. Its changes
