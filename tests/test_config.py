@@ -47,3 +47,11 @@ def test_old_default_hosts_are_upgraded(tmp_path):
     assert cfg.hosts == config.DEFAULT_HOSTS and not warn
     cfg, _ = config.load(write(tmp_path, json.dumps({"hosts": ["example.com"]})))
     assert cfg.hosts == ["example.com"]
+
+
+def test_old_default_strategies_are_upgraded(tmp_path):
+    from dpi_dashboard.setup.strategies import OLD_DEFAULT_STRATEGIES, STRATEGIES
+    cfg, warn = config.load(write(tmp_path, json.dumps({"strategies": OLD_DEFAULT_STRATEGIES[0]})))
+    assert cfg.strategies == STRATEGIES and not warn
+    cfg, _ = config.load(write(tmp_path, json.dumps({"strategies": ["--dpi-desync=fake"]})))
+    assert cfg.strategies == ["--dpi-desync=fake"]

@@ -8,7 +8,7 @@ import sys
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
-from .setup.strategies import STRATEGIES, is_safe
+from .setup.strategies import OLD_DEFAULT_STRATEGIES, STRATEGIES, is_safe
 
 BACKENDS = ("auto", "systemd", "windows-service")
 LANGUAGES = ("auto", "en", "tr")
@@ -65,6 +65,8 @@ def load(path: Path | None = None) -> tuple[Config, str | None]:
         elif (k == "strategies" and isinstance(v, list) and v
               and all(isinstance(x, str) and is_safe(x.strip()) for x in v)):
             cfg.strategies = [x.strip() for x in v]
+            if cfg.strategies in OLD_DEFAULT_STRATEGIES:
+                cfg.strategies = list(STRATEGIES)
         elif k == "backend" and v in BACKENDS:
             cfg.backend = v
         elif k == "language" and v in LANGUAGES:

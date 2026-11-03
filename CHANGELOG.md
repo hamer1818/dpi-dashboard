@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- New strategy list, measured on Turk Telekom: strategies that send a fake request first
+  (`fake` with `md5sig` / `badseq` and a randomized fake TLS hello, or `autottl`) reached
+  every Discord site; the old first choice, splitting alone, did on Linux but only got
+  6 of 18 connections through with winws on Windows. Settings files with the old default
+  list get the new one; run **Find the best setting again** to use it.
+
 ## 0.4.0
 
 - **Discord works fully, not just partly.** The service only handled HTTPS on TCP 443.
