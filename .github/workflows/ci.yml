@@ -1,15 +1,26 @@
+# One workflow for everything: tests, the real setup on fresh machines, the builds and,
+# for a v* tag, the GitHub release. The release is only published when every other job
+# passed.
+#
+# Setup jobs run the real setup on fresh CI machines: download and verify zapret, install
+# it as a service, pick a strategy, check that the bypass process runs and that the
+# internet still works, then uninstall and check that nothing is left behind. The CI
+# machines are already administrators, so the helpers run with --elevate none.
 name: CI
 
 on:
   push:
     branches: [main, "feature/**"]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   test:
+    name: test (${{ matrix.os }}, ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
@@ -34,9 +45,306 @@ jobs:
       - run: pytest -q
 
   shell:
+    name: shellcheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: shellcheck scripts/*.sh src/dpi_dashboard/assets/setup-linux.sh
+
+  setup-linux:
+    name: setup (ubuntu)
+    runs-on: ubuntu-latest
+    env:
+      # The setup downloads zapret through the GitHub API, which rate-limits shared CI IPs.
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Install and tune
+        run: sudo --preserve-env=GITHUB_TOKEN "$(command -v python)" -m dpi_dashboard.setup install --elevate none --tries 1
+      - name: Service is running and enabled
+        run: |
+          systemctl is-active zapret.service
+          systemctl is-enabled zapret.service
+          pgrep -a nfqws
+          test -f /opt/zapret/.installed-by-dpi-dashboard
+          sed -n '/^NFQWS_OPT=/,/^"/p' /opt/zapret/config
+      - name: Status from the app's point of view
+        run: |
+          python -m dpi_dashboard.setup check | tee status.json
+          python -c "import json; s = json.load(open('status.json')); assert s['service_found'] and s['managed'], s"
+      - name: Internet still works with zapret on
+        run: |
+          python - <<'PY'
+          from dpi_dashboard.probe import check_hosts
+          r = check_hosts(["github.com", "example.com", "discord.com"], tries=2)
+          for x in r:
+              print(x.host, x.successes, x.reasons)
+          assert all(x.successes == 2 for x in r)
+          PY
+      - name: Retune an existing install
+        run: sudo "$(command -v python)" -m dpi_dashboard.setup tune --elevate none --tries 1
+      - name: Uninstall
+        run: |
+          sudo "$(command -v python)" -m dpi_dashboard.setup uninstall --elevate none
+          ! systemctl cat zapret.service 2>/dev/null
+          test ! -e /opt/zapret
+          ! pgrep nfqws
+      - name: Logs
+        if: failure()
+        run: |
+          sudo journalctl -u zapret.service -n 60 --no-pager || true
+          sudo sh -c 'cat /tmp/dpi-dashboard-setup-*/setup.log' || true
+
+  # Other distributions, each in a container that boots systemd. The containers share the
+  # CI machine's kernel: nfqws, NFQUEUE and the firewall are real, but SELinux is not
+  # active (the Ubuntu host has none), so Fedora's SELinux handling is not exercised.
+  setup-distros:
+    runs-on: ubuntu-latest
+    env:
+      # The setup downloads zapret through the GitHub API, which rate-limits shared CI IPs.
+      GITHUB_TOKEN: ${{ github.token }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fedora
+            image: fedora:latest
+            prep: dnf -y install systemd python3 && dnf clean all
+          - name: debian-12
+            image: debian:12
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv python3 && rm -rf /var/lib/apt/lists/*
+          - name: arch
+            image: archlinux:latest
+            prep: pacman -Syu --noconfirm systemd python && pacman -Scc --noconfirm
+          - name: opensuse-tumbleweed
+            image: opensuse/tumbleweed:latest
+            prep: zypper -n install systemd python3 && zypper clean -a
+    name: setup (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Load the netfilter modules zapret needs (shared host kernel)
+        run: sudo modprobe -a nfnetlink_queue nft_queue xt_NFQUEUE || true
+      - name: Build and boot
+        run: |
+          docker build -q -t distro --build-arg IMAGE='${{ matrix.image }}' --build-arg PREP='${{ matrix.prep }}' -f packaging/ci/distro.Dockerfile packaging/ci
+          docker run -d --name dut --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD":/src:ro -e GITHUB_TOKEN distro
+          for i in $(seq 60); do
+            s=$(docker exec dut systemctl is-system-running 2>/dev/null || true)
+            case "$s" in running|degraded) echo "systemd: $s"; break ;; esac
+            sleep 2
+          done
+          docker exec dut sh -c 'cat /etc/os-release | head -2; python3 --version'
+          for t in curl nft iptables awk pgrep; do docker exec dut sh -c "command -v $t >/dev/null && echo 'present: $t' || echo 'missing: $t'"; done
+      - name: Install and tune
+        run: docker exec -e PYTHONPATH=/src/src dut python3 -m dpi_dashboard.setup install --elevate none --tries 1
+      - name: Service is running
+        run: |
+          docker exec dut systemctl is-active zapret.service
+          docker exec dut systemctl is-enabled zapret.service
+          docker exec dut sh -c 'grep -lx nfqws /proc/[0-9]*/comm'
+      - name: Internet still works with zapret on
+        run: |
+          docker exec -e PYTHONPATH=/src/src dut python3 -c "from dpi_dashboard.probe import check_hosts; r = check_hosts(['github.com', 'example.com', 'discord.com'], tries=2); print([(x.host, x.successes, x.reasons) for x in r]); assert all(x.successes == 2 for x in r)"
+      - name: Retune and uninstall
+        run: |
+          docker exec -e PYTHONPATH=/src/src dut python3 -m dpi_dashboard.setup tune --elevate none --tries 1
+          docker exec -e PYTHONPATH=/src/src dut python3 -m dpi_dashboard.setup uninstall --elevate none
+          docker exec dut sh -c '! systemctl cat zapret.service 2>/dev/null && test ! -e /opt/zapret'
+      - name: Logs
+        if: failure()
+        run: |
+          docker exec dut journalctl -u zapret.service -n 60 --no-pager || true
+          docker exec dut sh -c 'cat /tmp/dpi-dashboard-setup-*/setup.log' || true
+
+  setup-windows:
+    name: setup (windows)
+    runs-on: windows-latest
+    env:
+      # The setup downloads zapret through the GitHub API, which rate-limits shared CI IPs.
+      GITHUB_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      # --elevate auto: the same Start-Process -Verb RunAs path users go through (UAC is
+      # off on the CI machines, so it does not wait for a click).
+      - name: Install and tune (through RunAs)
+        timeout-minutes: 15
+        run: |
+          python -m dpi_dashboard.setup install --elevate auto --tries 1
+          if ($LASTEXITCODE -ne 0) { throw "setup failed: $LASTEXITCODE" }
+      - name: Service is running and starts automatically
+        run: |
+          $s = Get-Service zapret
+          $s | Format-List Name, Status, StartType
+          if ($s.Status -ne 'Running') { throw 'service is not running' }
+          if ($s.StartType -ne 'Automatic') { throw 'service is not automatic' }
+          Get-Process winws
+          (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\zapret).ImagePath
+          if (-not (Test-Path "$env:ProgramFiles\zapret\.installed-by-dpi-dashboard")) { throw 'marker missing' }
+      - name: Log folder is locked (users read, cannot write)
+        run: |
+          $users = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-545')
+          $deny = [System.Security.AccessControl.FileSystemRights]'Write, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership'
+          foreach ($p in "$env:ProgramData\dpi-dashboard", "$env:ProgramData\dpi-dashboard\logs") {
+            $acl = Get-Acl -LiteralPath $p
+            $acl.Access | Format-Table IdentityReference, FileSystemRights, IsInherited -AutoSize | Out-String | Write-Host
+            if (-not $acl.AreAccessRulesProtected) { throw "$p inherits permissions" }
+            $owner = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+            if ($owner -notin 'S-1-5-32-544', 'S-1-5-18') { throw "$p is owned by $owner" }
+            foreach ($r in $acl.Access) {
+              $sid = $r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier])
+              if ($sid.Value -notin 'S-1-5-32-544', 'S-1-5-18', 'S-1-5-32-545') { throw "unexpected entry $sid on $p" }
+              if ($sid -eq $users -and ($r.FileSystemRights -band $deny)) { throw "users can change $p" }
+            }
+          }
+          if (Get-ChildItem "$env:ProgramData\dpi-dashboard" -Directory -Filter 'work-*') { throw 'work folder left behind' }
+          Get-ChildItem "$env:ProgramData\dpi-dashboard\logs" | Format-Table Name, Length
+      - name: Status from the app's point of view
+        run: |
+          python -m dpi_dashboard.setup check | Tee-Object status.json
+          python -c "import json; s = json.load(open('status.json')); assert s['service_found'] and s['managed'], s"
+      - name: Internet still works with zapret on
+        run: |
+          python -c "from dpi_dashboard.probe import check_hosts; r = check_hosts(['github.com', 'example.com', 'discord.com'], tries=2); print([(x.host, x.successes, x.reasons) for x in r]); assert all(x.successes == 2 for x in r)"
+      - name: The app's own backend controls the service
+        run: |
+          python -c "from dpi_dashboard.backends import detect_backend; b = detect_backend(); print(b.label, b.state()); s = b.state(); assert b.service == 'zapret' and s.installed and s.active and s.enabled"
+      - name: Retune an existing install, with the DNS option
+        run: |
+          Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses | Out-String | Set-Content dns-before.txt
+          python -m dpi_dashboard.setup tune --elevate none --tries 1 --dns-dot
+          if ($LASTEXITCODE -ne 0) { throw "tune failed: $LASTEXITCODE" }
+          $up = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' }
+          foreach ($c in $up) {
+            $s = (Get-DnsClientServerAddress -InterfaceIndex $c.InterfaceIndex -AddressFamily IPv4).ServerAddresses
+            Write-Host "$($c.InterfaceAlias): $s"
+            if ($s -notcontains '1.1.1.1') { throw "DNS of $($c.InterfaceAlias) was not changed" }
+          }
+          if (-not (Test-Path "$env:ProgramFiles\zapret\dns-backup.json")) { throw 'DNS backup missing' }
+          Resolve-DnsName discord.com -Type A
+      - name: Uninstall
+        run: |
+          python -m dpi_dashboard.setup uninstall --elevate auto
+          if ($LASTEXITCODE -ne 0) { throw "uninstall failed: $LASTEXITCODE" }
+          $after = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses | Out-String
+          Write-Host $after
+          if ($after.Trim() -ne (Get-Content dns-before.txt -Raw).Trim()) { Get-Content dns-before.txt; throw 'DNS was not restored' }
+          if (Get-Service zapret -ErrorAction SilentlyContinue) { throw 'service still exists' }
+          if (Test-Path "$env:ProgramFiles\zapret") { throw 'folder still exists' }
+          if (Get-Process winws -ErrorAction SilentlyContinue) { throw 'winws still running' }
+      - name: Logs
+        if: failure()
+        run: Get-ChildItem $env:TEMP -Filter 'dpi-dashboard-setup-*' -Directory | ForEach-Object { Get-Content (Join-Path $_.FullName 'setup.log') -ErrorAction SilentlyContinue }
+
+  build-windows:
+    name: build (windows exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      # Exact versions with hashes: a changed or replaced package on PyPI fails the build.
+      - run: pip install --require-hashes -r packaging/requirements/release-windows.txt
+      - run: pip install --no-deps --no-build-isolation .
+      - name: Build
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name dpi-dashboard
+          --icon src/dpi_dashboard/assets/icon.ico
+          --collect-data dpi_dashboard
+          --add-data "LICENSE;licenses"
+          --add-data "THIRD_PARTY_NOTICES.md;licenses"
+          --add-data "licenses;licenses"
+          packaging/windows/entry.py
+      - name: The program carries its license texts
+        run: |
+          $list = pyi-archive_viewer --list --recursive dist\dpi-dashboard.exe
+          $list | Select-String -Pattern 'licen|NOTICES' | ForEach-Object { $_.Line.Trim() }
+          foreach ($f in 'GPL-3.0.txt', 'LGPL-3.0.txt', 'Python-PSF-2.0.txt', 'LICENSE', 'THIRD_PARTY_NOTICES.md') {
+            if (-not ($list | Select-String -Pattern ('licenses[\\/]+' + [regex]::Escape($f)))) { throw "missing from the exe: $f" }
+          }
+      - name: License texts for the release
+        shell: pwsh
+        run: Compress-Archive -Path LICENSE, THIRD_PARTY_NOTICES.md, licenses -DestinationPath dist\licenses.zip
+      - name: Check that the packaged app starts
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $p = Start-Process dist\dpi-dashboard.exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed: $($p.ExitCode)" }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows
+          path: |
+            dist/dpi-dashboard.exe
+            dist/licenses.zip
+
+  build-python:
+    name: build (python packages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install --require-hashes -r packaging/requirements/release-python.txt
+      - run: python -m build --no-isolation
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, shell, setup-linux, setup-distros, setup-windows, build-windows, build-python]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # create the GitHub release
+      id-token: write       # sign the build provenance
+      attestations: write   # store it
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Name the Windows build and write checksums
+        run: |
+          mv artifacts/dpi-dashboard.exe "artifacts/dpi-dashboard-${GITHUB_REF_NAME}-windows-x64.exe"
+          mv artifacts/licenses.zip "artifacts/dpi-dashboard-${GITHUB_REF_NAME}-licenses.zip"
+          cd artifacts && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      # Lets anyone check that a file came from this workflow:
+      #   gh attestation verify FILE --repo hamer1818/dpi-dashboard
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/*
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" artifacts/*
+          --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          --title "DPI Dashboard $GITHUB_REF_NAME"

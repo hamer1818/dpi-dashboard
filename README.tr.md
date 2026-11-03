@@ -47,7 +47,7 @@ Bunlardan hiçbiri yoksa [Kurulum](#kurulum-düğmesi)'u kullanın. Servisinizin
 ### Desteklenen sistemler
 
 **Her değişiklikte otomatik test edilenler** (gerçek kurulum, yeniden ayarlama ve kaldırma,
-bkz. [Setup integration](.github/workflows/setup-integration.yml)):
+bkz. [CI](.github/workflows/ci.yml) içindeki `setup` işleri):
 
 | Sistem | Not |
 |---|---|

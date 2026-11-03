@@ -47,7 +47,7 @@ it in the [settings file](#settings).
 ### Supported systems
 
 **Tested automatically on every change** (a real install, retune and removal, see
-[Setup integration](.github/workflows/setup-integration.yml)):
+the `setup` jobs in [CI](.github/workflows/ci.yml)):
 
 | System | Notes |
 |---|---|
@@ -315,7 +315,7 @@ New backends live in `src/dpi_dashboard/backends/`: implement `state()` and
 `src/dpi_dashboard/assets/setup-linux.sh` and `setup-windows.ps1`; they report to the app
 with `@@` lines on stdout (Linux) or in a protected log file (Windows), see
 `setup/runner.py`, which also documents the security boundary. The
-[Setup integration](.github/workflows/setup-integration.yml) workflow runs a real install,
+`setup` jobs of the [CI](.github/workflows/ci.yml) workflow run a real install,
 retune and removal on fresh Ubuntu and Windows machines.
 
 Bug reports and pull requests are welcome. If you use a bypass tool with a service name
