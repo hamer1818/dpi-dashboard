@@ -184,3 +184,25 @@ def test_fetch_retries_dropped_connections_but_not_refusals(tmp_path):
     ok, out = call(tmp_path, ["fetch"], base + "MODE=deny; export MODE; "
                    f"fetch https://x {tmp_path}/f")
     assert not ok and "request limit" in out and (tmp_path / "calls").read_text().strip() == "1"
+
+
+def has_locale(name):
+    out = subprocess.run(["locale", "-a"], capture_output=True, text=True).stdout.lower()
+    return name.lower().replace("utf-8", "utf8") in out.replace("utf-8", "utf8")
+
+
+@pytest.mark.skipif(not has_locale("tr_TR.UTF-8"), reason="tr_TR.UTF-8 locale not installed")
+def test_checks_pass_in_turkish_locale(tmp_path):
+    """In tr_TR, [A-Za-z] has no "i": discord.com used to fail the host check."""
+    text = HELPER.read_text()
+    head = text[:text.index("\nWORK=")]
+    head = head.replace('[ "$(id -u)" = 0 ] || fail "must run as root"', "")
+    fns = subprocess.run(["sed", "-n", "/^check_strategies()/,/^}/p", str(HELPER)],
+                         capture_output=True, text=True, check=True).stdout
+    script = tmp_path / "t.sh"
+    script.write_text(head + "\n" + fns + "\ncheck_strategies\necho VALID $MAX\n")
+    r = subprocess.run(["bash", str(script), "tune", "--hosts", "discord.com gateway.discord.gg",
+                        "--strategy", "--dpi-desync=fake --dpi-desync-fooling=md5sig"],
+                       capture_output=True, text=True,
+                       env={**os.environ, "LANG": "tr_TR.UTF-8", "LC_ALL": ""})
+    assert r.stdout.strip() == "VALID 6", r.stdout + r.stderr

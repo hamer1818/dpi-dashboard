@@ -21,6 +21,9 @@
 set -u
 umask 022
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Ranges like [A-Za-z] follow the locale's collation. In tr_TR.UTF-8 (which pkexec passes
+# on) they do not contain "i", so every host with an i failed the checks below.
+export LC_ALL=C
 
 ZDIR=/opt/zapret
 UNIT=/etc/systemd/system/zapret.service

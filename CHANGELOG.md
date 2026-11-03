@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.5.2
 
+- **Linux: Setup failed with "invalid host" on systems in Turkish.** In the tr_TR locale,
+  which `pkexec` passes to the helper, `[A-Za-z]` does not contain the letter "i", so
+  `discord.com` failed the host check. The helper now runs with `LC_ALL=C`.
 - README (English and Turkish) rewritten as step-by-step guides for Windows and Linux,
   with new screenshots made from the real widgets (`scripts/screenshots.py`).
 - `uninstall-linux.sh` also removes the "Start when I log in" entry.
