@@ -14,6 +14,9 @@
   the release's `SHA256SUMS` and GitHub's own checksum, and install it when the app
   restarts (**Restart now**) or quits. Other installs only get a notice with a link.
 - Only one window per user: starting the app again brings the running one to the front.
+- Windows: the DNS change could fail with "Exception setting NetAdapter" on machines
+  where an interface has more than one adapter object; connected adapters are now found
+  from the default routes.
 - The **Settings** button is now a menu; the settings file opens from there.
 - Build: PyQt6 6.12.0 / Qt 6.12.0, setuptools 84.2.1. CI is a single workflow; the release
   is only published when all tests and setup checks pass.

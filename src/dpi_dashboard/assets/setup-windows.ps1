@@ -274,9 +274,11 @@ function Read-DnsBackup {
 
 function Set-SecureDns {
     Log '@@STEP dns'
-    $adapters = @(Get-NetIPConfiguration | Where-Object {
-        ($_.IPv4DefaultGateway -or $_.IPv6DefaultGateway) -and $_.NetAdapter.Status -eq 'Up' } |
-        ForEach-Object { $_.NetAdapter })
+    # Adapters with a default route. Not Get-NetIPConfiguration: it throws on some machines
+    # ("Exception setting NetAdapter") when an interface has more than one adapter object.
+    $routed = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0', '::/0' -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty ifIndex -Unique)
+    $adapters = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $routed -contains $_.ifIndex })
     if ($adapters.Count -eq 0) { Log '@@WARN dns-no-adapter'; return }
     $saved = @(Read-DnsBackup)
     foreach ($a in $adapters) {

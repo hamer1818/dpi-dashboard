@@ -232,11 +232,13 @@ jobs:
           Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses | Out-String | Set-Content dns-before.txt
           python -m dpi_dashboard.setup tune --elevate none --tries 1 --dns-dot
           if ($LASTEXITCODE -ne 0) { throw "tune failed: $LASTEXITCODE" }
-          $up = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' }
+          $routed = @(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Select-Object -ExpandProperty ifIndex -Unique)
+          $up = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $routed -contains $_.ifIndex }
+          if (-not $up) { throw 'no connected adapter found' }
           foreach ($c in $up) {
-            $s = (Get-DnsClientServerAddress -InterfaceIndex $c.InterfaceIndex -AddressFamily IPv4).ServerAddresses
-            Write-Host "$($c.InterfaceAlias): $s"
-            if ($s -notcontains '1.1.1.1') { throw "DNS of $($c.InterfaceAlias) was not changed" }
+            $s = (Get-DnsClientServerAddress -InterfaceIndex $c.ifIndex -AddressFamily IPv4).ServerAddresses
+            Write-Host "$($c.Name): $s"
+            if ($s -notcontains '1.1.1.1') { throw "DNS of $($c.Name) was not changed" }
           }
           if (-not (Test-Path "$env:ProgramFiles\zapret\dns-backup.json")) { throw 'DNS backup missing' }
           Resolve-DnsName discord.com -Type A
