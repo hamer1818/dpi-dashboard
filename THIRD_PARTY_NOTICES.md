@@ -12,8 +12,8 @@ The license texts are included in the program, in this repository and in the
 
 | Component | Version | License | Source code |
 |---|---|---|---|
-| PyQt6 (Riverbank Computing) | 6.11.0 | GPL-3.0-only | <https://pypi.org/project/PyQt6/6.11.0/#files> |
-| Qt 6 (The Qt Company), as PyQt6-Qt6 | 6.11.2 | LGPL-3.0 | <https://download.qt.io/official_releases/qt/> |
+| PyQt6 (Riverbank Computing) | 6.12.0 | GPL-3.0-only | <https://pypi.org/project/PyQt6/6.12.0/#files> |
+| Qt 6 (The Qt Company), as PyQt6-Qt6 | 6.12.0 | LGPL-3.0 | <https://download.qt.io/official_releases/qt/> |
 | PyQt6-sip (Riverbank Computing) | 13.13.0 | BSD-2-Clause | <https://pypi.org/project/PyQt6-sip/13.13.0/#files> |
 | Python runtime | 3.12 | PSF-2.0 | <https://www.python.org/downloads/source/> |
 | PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later with the Bootloader Exception (no conditions on the built program) | <https://github.com/pyinstaller/pyinstaller> |

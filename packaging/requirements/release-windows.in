@@ -1,2 +1,7 @@
 PyQt6
 pyinstaller
+# PyInstaller needs these on Windows only (environment markers). Listed here so that a
+# lock file re-resolved on Linux, as Dependabot does, still pins them.
+pefile
+pywin32-ctypes
+setuptools

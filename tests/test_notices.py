@@ -23,3 +23,10 @@ def test_bundled_versions_match_the_lock_file():
 def test_license_texts_are_present():
     for f in ["GPL-3.0.txt", "LGPL-3.0.txt", "Python-PSF-2.0.txt", "PyQt6-sip-BSD-2-Clause.txt"]:
         assert (ROOT / "licenses" / f).stat().st_size > 500
+
+
+def test_windows_only_build_dependencies_stay_locked():
+    """pip --require-hashes fails the Windows build if any of these is missing."""
+    lock = locked()
+    for name in ["pefile", "pywin32-ctypes", "setuptools", "altgraph", "pyinstaller"]:
+        assert name in lock, f"{name} missing from release-windows.txt"
