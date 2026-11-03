@@ -29,6 +29,13 @@ Dashboard o servisin arayüzüdür.
   "şifresiz" bir kural kurmaz.
 - Hiçbir şeyi olmayan bir bilgisayar için **Kurulum**: eksikleri bulur, zapret'i indirip
   doğrular, servis olarak kurar ve bağlantınızda çalışan bir ayar seçer. **Kaldır** geri alır.
+- Durumu gösteren sistem tepsisi simgesi (yeşil açık, gri kapalı, kırmızı yok); menüden
+  servisi açıp kapatma ve test. Pencereyi kapatınca tepside çalışmaya devam eder.
+- İsteğe bağlı olarak oturum açılınca doğrudan tepside başlar (**Ayarlar → Oturum açılınca
+  başlat**).
+- GitHub sürümlerinden kendini günceller: Windows programı ve Linux kullanıcı kurulumu
+  yeni sürümü indirir, sürümün `SHA256SUMS` dosyası ve GitHub'ın özetiyle doğrular, uygulama
+  yeniden başlarken ya da kapanırken kurar. Diğer kurulumlar bağlantılı bir bildirim alır.
 - Türkçe ve İngilizce, sistem diline göre.
 - Linux (systemd) ve Windows.
 
@@ -156,7 +163,8 @@ python -m dpi_dashboard.setup install      # ya da: tune, uninstall
 
 ## Ayarlar
 
-**Ayarlar** düğmesi ayar dosyasını açar, ilk kullanımda varsayılanlarla oluşturur:
+**Ayarlar → Ayar dosyasını aç** ayar dosyasını açar, ilk kullanımda varsayılanlarla
+oluşturur:
 
 - Linux: `~/.config/dpi-dashboard/config.json`
 - Windows: `%APPDATA%\dpi-dashboard\config.json`
@@ -171,6 +179,13 @@ python -m dpi_dashboard.setup install      # ya da: tune, uninstall
 | `language` | `auto`, `en` ya da `tr` |
 | `refresh_seconds` | Durumun ne sıklıkla yeniden okunacağı. |
 | `strategies` | Kurulumun sırayla denediği HTTPS zapret seçenekleri. Sadece düz seçenek karakterleri kabul edilir. |
+| `auto_update` | Yeni sürümleri kendisi indirip kursun. `false`: sadece yeni sürüm olduğunu göstersin. |
+| `close_to_tray` | Pencere kapatılınca uygulama sistem tepsisinde çalışmaya devam etsin. |
+
+**Ayarlar** düğmesi bir menüdür: oturum açılınca başlat, tepside kalsın, otomatik
+güncelleme, şimdi denetle ve bu dosyayı aç. Oturum açılınca başlatma burada saklanmaz:
+Windows'ta `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` altındaki `DPI Dashboard`
+değeri, Linux'ta `~/.config/autostart/dpi-dashboard.desktop` dosyasıdır.
 
 Geçersiz değerler yok sayılır ve pencerede bildirilir. Düzenledikten sonra uygulamayı
 yeniden başlatın.
@@ -191,8 +206,15 @@ Ancak bundan sonra bir şey kurulur.
 **Kabuğa ya da kayıt defterine ulaşmadan önce denetlenenler.** Stratejiler, site adları,
 servis adları ve Windows günlük adı katı kalıplara göre denetlenir.
 
+**Güncellemeler.** Uygulama sadece kendini, hiçbir zaman yönetici yetkisiyle değil, bu
+deponun sürümlerinden günceller: dosya bir
+`github.com/hamer1818/dpi-dashboard/releases/download/` adresinden gelmeli ve hem sürümün
+`SHA256SUMS` dosyasıyla hem de GitHub'ın yayınladığı SHA-256 ile eşleşmelidir. İkisi de
+GitHub'dan geldiği için bu, bozuk ya da değiştirilmiş indirmelere karşı korur, depoyu ele
+geçiren birine karşı değil. Kapatmak için `"auto_update": false`.
+
 **Ağ.** Ağı dinleyen hiçbir şey yoktur, telemetri yoktur. İstekler `api.github.com` /
-`github.com` (kurulum), ayarlardaki siteler (bağlantı testi) ve `cloudflare-dns.com` ya da
+`github.com` (kurulum, güncelleme denetimi), ayarlardaki siteler (bağlantı testi) ve `cloudflare-dns.com` ya da
 `dns.google`'a (DNS kontrolü ilk test sitesinin adını sorar) gider. İsteğe bağlı şifreli
 DNS, DNS sorgularınızı Quad9 ve Cloudflare'e gönderir.
 

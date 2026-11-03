@@ -29,6 +29,13 @@ the command line. DPI Dashboard is a front end for that service.
 - **Setup** for a computer that has nothing yet: finds what is missing, downloads and
   verifies zapret, installs it as a service and picks a setting that works on your
   connection. **Remove** undoes it.
+- System tray icon that shows the state (green on, gray off, red missing), with a menu to
+  turn the service on or off and run the test. Closing the window keeps it in the tray.
+- Optional start at login, straight into the tray (**Settings → Start when I log in**).
+- Updates itself from the GitHub releases: the Windows program and the Linux user
+  install download a new version, check it against the release's `SHA256SUMS` and
+  GitHub's checksum, and install it when the app restarts or quits. Other installs get a
+  notice with a link.
 - English and Turkish, picked from the system language.
 - Linux (systemd) and Windows.
 
@@ -168,8 +175,8 @@ python -m dpi_dashboard.setup install      # or: tune, uninstall
 
 ## Settings
 
-The **Settings** button opens the settings file, creating it with defaults on first
-use:
+**Settings → Open the settings file** opens the settings file, creating it with defaults
+on first use:
 
 - Linux: `~/.config/dpi-dashboard/config.json`
 - Windows: `%APPDATA%\dpi-dashboard\config.json`
@@ -179,12 +186,14 @@ use:
   "backend": "auto",
   "service": null,
   "hosts": ["discord.com", "gateway.discord.gg", "cdn.discordapp.com",
-            "discord.gg", "status.discord.com"],
+            "media.discordapp.net", "discord.gg", "updates.discord.com"],
   "tries": 3,
   "timeout": 6.0,
   "language": "auto",
   "refresh_seconds": 2.0,
-  "strategies": ["--dpi-desync=multidisorder --dpi-desync-split-pos=2 --dpi-desync-split-seqovl=1", "..."]
+  "strategies": ["--dpi-desync=fake,multidisorder --dpi-desync-split-pos=1,midsld ...", "..."],
+  "auto_update": true,
+  "close_to_tray": true
 }
 ```
 
@@ -198,6 +207,13 @@ use:
 | `language` | `auto`, `en` or `tr` |
 | `refresh_seconds` | How often the status is re-read. |
 | `strategies` | zapret options for HTTPS that Setup tries, in order. Only plain option characters are accepted. |
+| `auto_update` | Download and install new releases by itself. `false`: only show that one is available. |
+| `close_to_tray` | Closing the window keeps the app running in the system tray. |
+
+The **Settings** button is a menu: start at login, keep in tray, automatic updates, check
+for updates now, and open this file. Start at login is not stored here: it is the
+`DPI Dashboard` value in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` on Windows and
+`~/.config/autostart/dpi-dashboard.desktop` on Linux.
 
 Invalid values are ignored and reported in the window. Restart the app after editing.
 
@@ -228,9 +244,17 @@ links that leave the folder. Only then is anything installed.
 **What is checked before it reaches a shell or the registry.** Strategies, host names,
 service names and the Windows log name are validated against strict patterns.
 
+**Updates.** The app updates only itself, never with administrator rights, from the
+releases of this repository: the file must come from a
+`github.com/hamer1818/dpi-dashboard/releases/download/` URL and match both the release's
+`SHA256SUMS` and the SHA-256 GitHub publishes for it. Both come from GitHub, so this
+protects against broken or swapped downloads, not against someone who controls the
+repository. Turn it off with `"auto_update": false`.
+
 **Network.** Nothing listens on the network and there is no telemetry. Requests go to
-`api.github.com` / `github.com` (setup), the sites in your settings (connection test) and
-`cloudflare-dns.com` or `dns.google` (the DNS check asks them for the first test site).
+`api.github.com` / `github.com` (setup, update check), the sites in your settings
+(connection test) and `cloudflare-dns.com` or `dns.google` (the DNS check asks them for
+the first test site).
 The optional encrypted DNS sends your DNS queries to Quad9 and Cloudflare.
 
 **Risks that come with zapret itself.** zapret inspects and rewrites your web traffic.

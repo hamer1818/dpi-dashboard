@@ -19,6 +19,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "all_ok": "All test addresses are reachable.",
         "some_blocked": "Some addresses are being blocked.",
         "settings": "Settings",
+        "tray_show": "Show window",
+        "tray_quit": "Quit",
+        "tray_still_running": "DPI Dashboard keeps running here. Right-click for the menu, "
+                              "“Quit” to close it.",
+        "opt_autostart": "Start when I log in (in the system tray)",
+        "opt_close_to_tray": "Closing the window keeps it in the system tray",
+        "opt_auto_update": "Download and install updates automatically",
+        "check_updates": "Check for updates now",
+        "open_settings_file": "Open the settings file",
+        "update_checking": "Checking for updates…",
+        "update_none": "DPI Dashboard is up to date.",
+        "update_ready": "Version {version} is downloaded and verified; it is installed when "
+                        "DPI Dashboard closes. <a href='#restart'>Restart now</a>",
+        "update_ready_tray": "Version {version} is ready. Open the window to restart now, "
+                             "or it is installed when DPI Dashboard closes.",
+        "update_available": "Version {version} is available. <a href='{page}'>Download</a>",
+        "update_failed": "Update failed: {msg}",
         "no_backend": "This system has no supported service manager "
                       "(systemd on Linux, services on Windows).",
         "not_installed": "Service “{service}” was not found. Use “Setup” to install zapret, "
@@ -125,6 +142,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "all_ok": "Tüm test adreslerine erişiliyor.",
         "some_blocked": "Bazı adresler engelleniyor.",
         "settings": "Ayarlar",
+        "tray_show": "Pencereyi göster",
+        "tray_quit": "Çık",
+        "tray_still_running": "DPI Dashboard burada çalışmaya devam ediyor. Menü için sağ "
+                              "tıklayın, kapatmak için “Çık”.",
+        "opt_autostart": "Oturum açılınca başlat (sistem tepsisinde)",
+        "opt_close_to_tray": "Pencere kapatılınca sistem tepsisinde kalsın",
+        "opt_auto_update": "Güncellemeleri otomatik indir ve kur",
+        "check_updates": "Güncellemeleri şimdi denetle",
+        "open_settings_file": "Ayar dosyasını aç",
+        "update_checking": "Güncellemeler denetleniyor…",
+        "update_none": "DPI Dashboard güncel.",
+        "update_ready": "{version} sürümü indirildi ve doğrulandı; DPI Dashboard kapanınca "
+                        "kurulur. <a href='#restart'>Şimdi yeniden başlat</a>",
+        "update_ready_tray": "{version} sürümü hazır. Hemen yeniden başlatmak için pencereyi "
+                             "açın; yoksa DPI Dashboard kapanınca kurulur.",
+        "update_available": "{version} sürümü çıktı. <a href='{page}'>İndir</a>",
+        "update_failed": "Güncelleme başarısız: {msg}",
         "no_backend": "Bu sistemde desteklenen bir servis yöneticisi yok "
                       "(Linux'ta systemd, Windows'ta servisler).",
         "not_installed": "“{service}” servisi bulunamadı. zapret'i kurmak için “Kurulum”u "

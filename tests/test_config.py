@@ -55,3 +55,18 @@ def test_old_default_strategies_are_upgraded(tmp_path):
     assert cfg.strategies == STRATEGIES and not warn
     cfg, _ = config.load(write(tmp_path, json.dumps({"strategies": ["--dpi-desync=fake"]})))
     assert cfg.strategies == ["--dpi-desync=fake"]
+
+
+def test_switches(tmp_path):
+    cfg, warn = config.load(write(tmp_path, {"auto_update": False, "close_to_tray": "no"}))
+    assert cfg.auto_update is False and cfg.close_to_tray is True and "close_to_tray" in warn
+
+
+def test_set_value_keeps_the_rest(tmp_path):
+    p = write(tmp_path, {"hosts": ["x.com"], "custom": 1})
+    config.set_value("auto_update", False, p)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data == {"hosts": ["x.com"], "custom": 1, "auto_update": False}
+    fresh = tmp_path / "new" / "config.json"
+    config.set_value("close_to_tray", False, fresh)
+    assert json.loads(fresh.read_text(encoding="utf-8"))["close_to_tray"] is False

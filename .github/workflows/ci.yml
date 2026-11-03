@@ -294,6 +294,28 @@ jobs:
         run: |
           $p = Start-Process dist\dpi-dashboard.exe -ArgumentList '--self-test' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "self-test failed: $($p.ExitCode)" }
+      # What a self-update relies on: one program per user (a second start hands over to
+      # the first and exits), and a running .exe can be renamed so the new one takes its
+      # place. A copy runs, so the build uploaded below stays untouched.
+      - name: Single instance and replacing the running program
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $dir = New-Item -ItemType Directory "$env:RUNNER_TEMP\upd" -Force
+          Copy-Item dist\dpi-dashboard.exe "$dir\DPI Dashboard.exe"
+          $first = Start-Process "$dir\DPI Dashboard.exe" -ArgumentList '--minimized' -PassThru
+          Start-Sleep -Seconds 8
+          if ($first.HasExited) { throw "first instance exited: $($first.ExitCode)" }
+          $second = Start-Process "$dir\DPI Dashboard.exe" -PassThru
+          if (-not $second.WaitForExit(20000)) { throw 'second instance did not hand over' }
+          if ($second.ExitCode -ne 0) { throw "second instance: $($second.ExitCode)" }
+          Set-Content "$dir\.dpi-dashboard-update.exe" 'new build'
+          python -c "import sys; from pathlib import Path; from dpi_dashboard import updater; d = Path(sys.argv[1]); updater.apply_exe(d / '.dpi-dashboard-update.exe', d / 'DPI Dashboard.exe')" $dir
+          if ((Get-Content "$dir\DPI Dashboard.exe" -Raw).Trim() -ne 'new build') { throw 'not replaced' }
+          if (-not (Test-Path "$dir\DPI Dashboard.old.exe")) { throw 'old program missing' }
+          if ($first.HasExited) { throw 'running program stopped' }
+          Stop-Process -Id $first.Id
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows

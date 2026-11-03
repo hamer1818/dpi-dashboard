@@ -29,6 +29,8 @@ class Config:
     language: str = "auto"          # "auto", "en" or "tr"
     refresh_seconds: float = 2.0
     strategies: list[str] = field(default_factory=lambda: list(STRATEGIES))  # setup order
+    auto_update: bool = True        # download and install new releases by itself
+    close_to_tray: bool = True      # closing the window keeps it running in the tray
 
 
 def config_path() -> Path:
@@ -71,6 +73,8 @@ def load(path: Path | None = None) -> tuple[Config, str | None]:
             cfg.backend = v
         elif k == "language" and v in LANGUAGES:
             cfg.language = v
+        elif k in ("auto_update", "close_to_tray") and type(v) is bool:
+            setattr(cfg, k, v)
         elif k == "tries" and type(v) is int:
             cfg.tries = v
         elif k in ("timeout", "refresh_seconds") and type(v) in (int, float) and v > 0:
@@ -80,6 +84,25 @@ def load(path: Path | None = None) -> tuple[Config, str | None]:
     if cfg.tries < 1:
         cfg.tries, bad = 1, bad + ["tries"]
     return cfg, (f"{path}: ignored {', '.join(sorted(set(bad)))}" if bad else None)
+
+
+def set_value(key: str, value, path: Path | None = None) -> None:
+    """Change one setting in the file, keeping everything else the user wrote there."""
+    if key not in {f.name for f in fields(Config)}:
+        raise KeyError(key)
+    path = path or config_path()
+    data: dict = asdict(Config())
+    try:
+        old = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(old, dict):
+            data = old
+    except (OSError, ValueError):
+        pass
+    data[key] = value
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def ensure_file(path: Path | None = None) -> Path:

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+
+- **System tray.** The icon shows the state (green on, gray off, red missing); its menu
+  turns the service on or off, runs the test, shows the window or quits. Closing the
+  window keeps the app in the tray (setting `close_to_tray`).
+- **Start at login**, straight into the tray: **Settings → Start when I log in**
+  (Windows: the current user's Run key; Linux: an XDG autostart entry). New
+  `--minimized` option.
+- **Automatic updates** from the GitHub releases (setting `auto_update`, on by default,
+  checked at start and every 12 hours, or **Settings → Check for updates now**). The
+  Windows program and the Linux user install download the new version, verify it against
+  the release's `SHA256SUMS` and GitHub's own checksum, and install it when the app
+  restarts (**Restart now**) or quits. Other installs only get a notice with a link.
+- Only one window per user: starting the app again brings the running one to the front.
+- The **Settings** button is now a menu; the settings file opens from there.
+- Build: PyQt6 6.12.0 / Qt 6.12.0, setuptools 84.2.1. CI is a single workflow; the release
+  is only published when all tests and setup checks pass.
+
 ## 0.4.1
 
 - New strategy list, measured on Turk Telekom: strategies that send a fake request first

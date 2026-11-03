@@ -83,3 +83,53 @@ def test_about_shows_licenses_and_warranty(app):
     for part in ("MIT", "GPL", "LGPL", "NO WARRANTY", __version__, "THIRD_PARTY_NOTICES.md"):
         assert part in text
     assert "About and licenses" in w.about.text()
+
+
+def test_close_goes_to_tray_or_quits(app, monkeypatch):
+    from dpi_dashboard import app as app_mod
+    quits = []
+    monkeypatch.setattr(app_mod.QApplication.instance(), "quit", lambda: quits.append(1))
+    w = window(ServiceState(True, True, True))
+    w.tray = type("T", (), {"showMessage": lambda *a: None})()      # a tray without a screen
+    w.show()
+    w.close()
+    assert not w.isVisible() and not quits                        # hidden, still running
+    w.cfg.close_to_tray = False
+    w.show()
+    w.close()
+    assert quits
+
+
+def test_settings_menu_saves_options(app, monkeypatch):
+    saved = {}
+    monkeypatch.setattr("dpi_dashboard.config.set_value", lambda k, v: saved.update({k: v}))
+    w = window(ServiceState(True, True, True))
+    w.update_action.setChecked(False)
+    w.tray_action.setChecked(False)
+    assert saved == {"auto_update": False, "close_to_tray": False}
+    assert not w.cfg.auto_update and not w.cfg.close_to_tray
+
+
+def test_update_ready_and_available(app):
+    from dpi_dashboard.updater import Release
+    w = window(ServiceState(True, True, True))
+    rel = Release("v9.0.0", "9.0.0", "https://example.com/r", None, None)
+    w.on_update_checked(("available", rel, None), manual=False)
+    assert "9.0.0" in w.update_label.text() and "example.com/r" in w.update_label.text()
+    w.on_update_checked(("ready", rel, "/tmp/x"), manual=False)
+    assert "#restart" in w.update_label.text() and w.pending_update == (rel, "/tmp/x")
+    w2 = window(ServiceState(True, True, True))
+    w2.on_update_checked(("error", None, "offline"), manual=False)
+    assert not w2.update_label.text()                    # quiet unless asked
+    w2.on_update_checked(("error", None, "offline"), manual=True)
+    assert "offline" in w2.update_label.text()
+
+
+def test_tray_follows_the_service_state(app):
+    w = window(ServiceState(True, True, True), tray=True)
+    assert w.tray_toggle.text() == "Turn off" and w.tray_color == "#2e9e44"
+    assert "ON" in w.tray.toolTip()
+    w.backend.st = ServiceState(True, False, False)
+    w.refresh()
+    assert w.tray_toggle.text() == "Turn on" and w.tray_color == "#8a8a8a"
+    w.tray.hide()
