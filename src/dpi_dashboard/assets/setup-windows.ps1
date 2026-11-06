@@ -103,16 +103,12 @@ $Max = $HostList.Count * $TriesN
 $List = @($Strategies.Split('|') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 foreach ($s in $List) { if ($s -notmatch $SafeStrategy) { Fail 'unsafe strategy' } }
 
-# Discord needs more than HTTPS on 443: voice runs over UDP (STUN and Discord's own IP
-# discovery packets, ports 19294-19344 and 50000-50100), some endpoints use Cloudflare's
-# extra TLS ports, and the app talks QUIC (UDP 443) to Cloudflare. Only the TCP part of
-# the profile is tuned; the UDP profiles are the ones the common zapret Discord presets use.
+# Some Discord endpoints use Cloudflare's extra TLS ports besides 443. UDP is left alone:
+# fakes sent ahead of Discord's voice packets (the Russian presets do this) made voice fail
+# with "No Route" on Turk Telekom, where voice is not blocked.
 $TlsPorts = '443,2053,2083,2087,2096,8443'
-$VoicePorts = '19294-19344,50000-50100'
 function ImagePath([string]$strategy) {
-    "`"$Dest\winws.exe`" --wf-tcp=80,$TlsPorts --wf-udp=443,$VoicePorts" +
-    " --filter-udp=443 --filter-l7=quic --dpi-desync=fake --dpi-desync-repeats=6 --new" +
-    " --filter-udp=$VoicePorts --filter-l7=discord,stun --dpi-desync=fake --dpi-desync-repeats=6 --new" +
+    "`"$Dest\winws.exe`" --wf-tcp=80,$TlsPorts" +
     " --filter-tcp=80 --hostcase --new" +
     " --filter-tcp=$TlsPorts $strategy"
 }

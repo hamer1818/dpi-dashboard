@@ -187,22 +187,19 @@ set_conf() {
     if grep -q "^$1=" "$f"; then sed -i "s|^$1=.*|$1=$2|" "$f"; else printf '%s=%s\n' "$1" "$2" >>"$f"; fi
 }
 
-# Discord also needs Cloudflare's extra TLS ports, QUIC and voice over UDP (STUN and
-# Discord's IP discovery). Only the TCP 443 part is tuned; the UDP profiles are the ones
-# the common zapret Discord presets use. Same profile as the Windows helper.
+# Some Discord endpoints use Cloudflare's extra TLS ports besides 443. UDP is left alone:
+# fakes sent ahead of Discord's voice packets (the Russian presets do this) made voice fail
+# with "No Route" on Turk Telekom, where voice is not blocked. Same as the Windows helper.
 TLS_PORTS=443,2053,2083,2087,2096,8443
-VOICE_PORTS=19294-19344,50000-50100
 
 # Replace the multi-line NFQWS_OPT="..." block (or add it).
 set_strategy() {
     local f=$ZDIR/config tmp
     tmp=$(mktemp)
-    awk -v s="$1" -v tls="$TLS_PORTS" -v voice="$VOICE_PORTS" '
+    awk -v s="$1" -v tls="$TLS_PORTS" '
         function block() {
             print "NFQWS_OPT=\""
             print "--filter-tcp=80 --hostcase <HOSTLIST> --new"
-            print "--filter-udp=443 --filter-l7=quic <HOSTLIST_NOAUTO> --dpi-desync=fake --dpi-desync-repeats=6 --new"
-            print "--filter-udp=" voice " --filter-l7=discord,stun --dpi-desync=fake --dpi-desync-repeats=6 --new"
             print "--filter-tcp=" tls " " s " <HOSTLIST>"
             print "\""
             done = 1
@@ -274,7 +271,7 @@ do_tune() {
     cp -p "$ZDIR/config" "$ZDIR/config.dpi-dashboard.bak"
     set_conf NFQWS_ENABLE 1
     set_conf NFQWS_PORTS_TCP "80,$TLS_PORTS"
-    set_conf NFQWS_PORTS_UDP "443,$VOICE_PORTS"
+    set_conf NFQWS_PORTS_UDP ""
 
     log "@@STEP baseline"
     run systemctl stop zapret.service 2>&1

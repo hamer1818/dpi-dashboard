@@ -41,8 +41,7 @@ servisleri olarak çalışırlar. DPI Dashboard bunu sizin yerinize yapar.
   belirtisi), zaman aşımı, DNS hatası ya da reddedilen sertifika.
 - Hiçbir şeyi olmayan bir bilgisayar için **Kurulum**: zapret'i indirip doğrular, servis
   olarak kurar, sağlayıcının sahteleyemeyeceği bir DNS'e geçer ve bir strateji listesini
-  ölçüp bağlantınızda çalışanı bırakır. Discord sesini (UDP) de kapsar. **Kaldır** hepsini
-  geri alır.
+  ölçüp bağlantınızda çalışanı bırakır. **Kaldır** hepsini geri alır.
 - Durumu bir bakışta gösteren **sistem tepsisi** simgesi; menüsünden servisi açıp kapatma
   ve test. Pencereyi kapatınca uygulama tepside çalışmaya devam eder.
 - **Oturum açılınca başlatma**, doğrudan tepside.
@@ -323,9 +322,10 @@ Windows'ta her siteye ulaştı; isteği sadece bölmek Linux'ta işe yaradı ama
 `winws` ile yaramadı. Kendi stratejilerinizi (örneğin zapret'in `blockcheck.sh`'ından)
 `strategies` ayarına yazabilirsiniz.
 
-**Servisin kapsadıkları.** 443 portunda HTTPS (ayarlanan kısım), 80 portunda HTTP, UDP
-üzerinden Discord sesi (STUN ve Discord'un IP keşfi, 19294–19344 ve 50000–50100
-portları), QUIC (UDP 443) ve Cloudflare'in ek TLS portları (2053, 2083, 2087, 2096, 8443).
+**Servisin kapsadıkları.** 443 portunda HTTPS (ayarlanan kısım), 80 portunda HTTP ve
+Cloudflare'in ek TLS portları (2053, 2083, 2087, 2096, 8443). UDP'ye dokunulmaz: Türk
+Telekom'da Discord sesi engelli değil ve Rusya için yazılmış zapret ayarlarının ses
+trafiğinden önce gönderdiği sahte paketler sesi "Hat yok" (No Route) hatasıyla bozuyordu.
 Windows'ta bu `zapret` servisinin komut satırıdır; Linux'ta `/opt/zapret/config` içindeki
 `NFQWS_OPT` ve port listeleri.
 
@@ -455,6 +455,10 @@ akışları son yayın adımı dışında salt okunur yetkiyle çalışır.
 Bir güvenlik açığı mı buldunuz? Lütfen gizli olarak bildirin, bkz. [SECURITY.md](SECURITY.md).
 
 ## Sorun giderme
+
+**Discord seste "Hat yok" (No Route) diyor.** 0.4.0–0.5.2 sürümleri Discord'un ses
+trafiğine de dokunuyordu ve bu sesi bozuyordu. 0.5.3 ya da sonrasına güncelleyip bir kez
+**Kurulum → En iyi ayarı yeniden bul**'u çalıştırın.
 
 **Discord açılıyor ama yavaş, ya da ses "RTC bağlanıyor"da kalıyor.** Kurulumdan sonra
 Discord'u tamamen kapatıp açın. Sonra **Bağlantıyı test et**'e basın: satırlar turuncu ya

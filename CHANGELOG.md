@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3
+
+- **Discord voice works again ("No Route").** 0.4.0 added the UDP rules of the zapret
+  Discord presets for Russia: fake packets sent ahead of voice (STUN / IP discovery) and
+  QUIC traffic. On Turk Telekom, voice is not blocked, and these fakes made Discord voice
+  fail with "No Route"; without them it connects. UDP is left alone again, on Windows
+  and Linux. Run **Setup → Find the best setting again** once to apply it.
+
 ## 0.5.2
 
 - **Linux: Setup failed with "invalid host" on systems in Turkish.** In the tr_TR locale,

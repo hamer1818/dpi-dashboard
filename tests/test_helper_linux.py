@@ -25,7 +25,7 @@ MODE_FILTER=none
 
 
 def run(zdir, script):
-    fns = subprocess.run(["sed", "-n", "/^TLS_PORTS=/p; /^VOICE_PORTS=/p; "
+    fns = subprocess.run(["sed", "-n", "/^TLS_PORTS=/p; "
                           "/^set_conf()/,/^}/p; /^set_strategy()/,/^}/p",
                           str(HELPER)], capture_output=True, text=True, check=True).stdout
     subprocess.run(["bash", "-c", fns + "\n" + script], check=True,
@@ -35,15 +35,11 @@ def run(zdir, script):
 
 def test_strategy_and_settings(tmp_path):
     (tmp_path / "config").write_text(UPSTREAM_LIKE)
-    out = run(tmp_path, "set_conf NFQWS_ENABLE 1; set_conf NFQWS_PORTS_UDP \"443,$VOICE_PORTS\"; "
+    out = run(tmp_path, "set_conf NFQWS_ENABLE 1; set_conf NFQWS_PORTS_UDP ''; "
                         "set_strategy '--dpi-desync=multisplit --dpi-desync-split-pos=2'")
-    assert "NFQWS_ENABLE=1\n" in out and "NFQWS_PORTS_UDP=443,19294-19344,50000-50100\n" in out
+    assert "NFQWS_ENABLE=1\n" in out and "NFQWS_PORTS_UDP=\n" in out
     assert out.count("NFQWS_OPT=") == 1
     assert ('NFQWS_OPT="\n--filter-tcp=80 --hostcase <HOSTLIST> --new\n'
-            "--filter-udp=443 --filter-l7=quic <HOSTLIST_NOAUTO> --dpi-desync=fake "
-            "--dpi-desync-repeats=6 --new\n"
-            "--filter-udp=19294-19344,50000-50100 --filter-l7=discord,stun --dpi-desync=fake "
-            "--dpi-desync-repeats=6 --new\n"
             "--filter-tcp=443,2053,2083,2087,2096,8443 --dpi-desync=multisplit "
             '--dpi-desync-split-pos=2 <HOSTLIST>\n"\n'
             "MODE_FILTER=none\n") in out

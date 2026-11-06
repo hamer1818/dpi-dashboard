@@ -42,8 +42,7 @@ stop from the command line. DPI Dashboard does that for you.
   timeout, DNS failure, or a rejected certificate.
 - **Setup** for a computer that has nothing yet: downloads and verifies zapret, installs
   it as a service, switches to DNS your provider cannot forge, and measures a list of
-  strategies to keep the one that works on your connection. Covers Discord voice (UDP)
-  too. **Remove** undoes all of it.
+  strategies to keep the one that works on your connection. **Remove** undoes all of it.
 - **System tray** icon that shows the state at a glance, with a menu to turn the service
   on or off and run the test. Closing the window keeps the app in the tray.
 - **Start at login**, straight into the tray.
@@ -328,11 +327,12 @@ every site on both Linux and Windows; splitting the request alone worked on Linu
 with `winws` on Windows. Put your own (for example from zapret's `blockcheck.sh`) in the
 `strategies` setting.
 
-**What the service covers.** HTTPS on port 443 (the tuned part), HTTP on port 80, Discord
-voice over UDP (STUN and Discord's IP discovery, ports 19294–19344 and 50000–50100), QUIC
-(UDP 443) and Cloudflare's extra TLS ports (2053, 2083, 2087, 2096, 8443). On Windows
-this is the command line of the `zapret` service; on Linux, `NFQWS_OPT` and the port
-lists in `/opt/zapret/config`.
+**What the service covers.** HTTPS on port 443 (the tuned part), HTTP on port 80 and
+Cloudflare's extra TLS ports (2053, 2083, 2087, 2096, 8443). UDP is left alone: Discord
+voice is not blocked on Turk Telekom, and the fake packets that zapret presets for Russia
+send ahead of voice traffic made voice fail with "No Route". On Windows this is the
+command line of the `zapret` service; on Linux, `NFQWS_OPT` and the port lists in
+`/opt/zapret/config`.
 
 **DNS.** Many providers also answer DNS questions for blocked sites with a wrong address,
 which no DPI bypass fixes. Setup compares your DNS answers with DNS over HTTPS and shows
@@ -457,6 +457,10 @@ with read-only tokens except for the final publishing step.
 Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
+
+**Discord voice says "No Route".** Versions 0.4.0–0.5.2 also changed Discord's voice
+traffic, which broke voice. Update to 0.5.3 or newer and run **Setup → Find the best
+setting again** once.
 
 **Discord opens but slowly, or voice stays at "RTC connecting".** Restart Discord
 completely after Setup. Then run **Test connection**: if lines are amber or red, run
