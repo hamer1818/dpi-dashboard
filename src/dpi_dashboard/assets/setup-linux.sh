@@ -191,16 +191,20 @@ set_conf() {
 # fakes sent ahead of Discord's voice packets (the Russian presets do this) made voice fail
 # with "No Route" on Turk Telekom, where voice is not blocked. Same as the Windows helper.
 TLS_PORTS=443,2053,2083,2087,2096,8443
+# zapret only touches connections to these domains (subdomains included). Upstream's
+# <HOSTLIST> marker expands to nothing with MODE_FILTER=none, which applied the desync to
+# every site and broke some of them. Same list as the Windows helper.
+DISCORD_DOMAINS=discord.com,discord.gg,discordapp.com,discordapp.net,discord.media,discordcdn.com,discord.dev,discord.new,discord.gift,discordstatus.com,dis.gd,discord.co,discord-attachments-uploads-prd.storage.googleapis.com
 
 # Replace the multi-line NFQWS_OPT="..." block (or add it).
 set_strategy() {
     local f=$ZDIR/config tmp
     tmp=$(mktemp)
-    awk -v s="$1" -v tls="$TLS_PORTS" '
+    awk -v s="$1" -v tls="$TLS_PORTS" -v hl="--hostlist-domains=$DISCORD_DOMAINS" '
         function block() {
             print "NFQWS_OPT=\""
-            print "--filter-tcp=80 --hostcase <HOSTLIST> --new"
-            print "--filter-tcp=" tls " " s " <HOSTLIST>"
+            print "--filter-tcp=80 --hostcase " hl " --new"
+            print "--filter-tcp=" tls " " s " " hl
             print "\""
             done = 1
         }

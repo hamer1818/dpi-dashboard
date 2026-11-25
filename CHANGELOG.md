@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **zapret touches only Discord now; other sites open again.** The strategy was applied
+  to every HTTPS connection: on Linux upstream's `<HOSTLIST>` marker expands to nothing
+  with `MODE_FILTER=none`, and on Windows `winws` got no host list at all, so the fakes and
+  splits broke some unrelated sites. Both helpers now pass a fixed Discord domain list
+  (`--hostlist-domains=discord.com,discord.gg,discordapp.com,…`, subdomains included).
+  Run **Setup → Find the best setting again** once to apply it.
+
 ## 0.5.3
 
 - **Discord voice works again ("No Route").** 0.4.0 added the UDP rules of the zapret

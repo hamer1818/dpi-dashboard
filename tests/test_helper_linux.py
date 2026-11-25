@@ -24,8 +24,22 @@ MODE_FILTER=none
 """
 
 
+def helper_domains(path=HELPER, prefix="DISCORD_DOMAINS="):
+    line = next(x for x in path.read_text(encoding="utf-8").splitlines() if x.startswith(prefix))
+    return line[len(prefix):].strip("'")
+
+
+def test_only_discord_domains():
+    domains = helper_domains().split(",")
+    assert "discord.com" in domains and "discord.gg" in domains and "discordapp.net" in domains
+    assert all(d == "discord-attachments-uploads-prd.storage.googleapis.com" or "dis" in d
+               for d in domains)
+    windows = HELPER.with_name("setup-windows.ps1")
+    assert helper_domains(windows, "$DiscordDomains = ") == ",".join(domains)
+
+
 def run(zdir, script):
-    fns = subprocess.run(["sed", "-n", "/^TLS_PORTS=/p; "
+    fns = subprocess.run(["sed", "-n", "/^TLS_PORTS=/p; /^DISCORD_DOMAINS=/p; "
                           "/^set_conf()/,/^}/p; /^set_strategy()/,/^}/p",
                           str(HELPER)], capture_output=True, text=True, check=True).stdout
     subprocess.run(["bash", "-c", fns + "\n" + script], check=True,
@@ -39,10 +53,13 @@ def test_strategy_and_settings(tmp_path):
                         "set_strategy '--dpi-desync=multisplit --dpi-desync-split-pos=2'")
     assert "NFQWS_ENABLE=1\n" in out and "NFQWS_PORTS_UDP=\n" in out
     assert out.count("NFQWS_OPT=") == 1
-    assert ('NFQWS_OPT="\n--filter-tcp=80 --hostcase <HOSTLIST> --new\n'
+    hl = "--hostlist-domains=" + helper_domains()
+    assert ('NFQWS_OPT="\n--filter-tcp=80 --hostcase ' + hl + ' --new\n'
             "--filter-tcp=443,2053,2083,2087,2096,8443 --dpi-desync=multisplit "
-            '--dpi-desync-split-pos=2 <HOSTLIST>\n"\n'
+            '--dpi-desync-split-pos=2 ' + hl + '\n"\n'
             "MODE_FILTER=none\n") in out
+    # <HOSTLIST> is empty with MODE_FILTER=none: it applied the desync to every site.
+    assert "<HOSTLIST" not in out
     # zapret sources this file with sh: it must stay valid shell.
     subprocess.run(["sh", "-n", str(tmp_path / "config")], check=True)
 
@@ -53,7 +70,7 @@ def test_single_line_block_and_missing_keys(tmp_path):
     assert out.startswith("A=1\nNFQWS_OPT=\"\n") and "B=2\n" in out and out.endswith("NEW=5\n")
     (tmp_path / "config").write_text("A=1\n")
     out = run(tmp_path, "set_strategy '--z'")
-    assert "--filter-tcp=443,2053,2083,2087,2096,8443 --z <HOSTLIST>" in out
+    assert "--filter-tcp=443,2053,2083,2087,2096,8443 --z --hostlist-domains=discord.com," in out
 
 
 def test_refuses_without_root():

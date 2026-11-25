@@ -107,10 +107,13 @@ foreach ($s in $List) { if ($s -notmatch $SafeStrategy) { Fail 'unsafe strategy'
 # fakes sent ahead of Discord's voice packets (the Russian presets do this) made voice fail
 # with "No Route" on Turk Telekom, where voice is not blocked.
 $TlsPorts = '443,2053,2083,2087,2096,8443'
+# winws only touches connections to these domains (subdomains included); without a list it
+# changed the traffic of every site and broke some of them. Same list as the Linux helper.
+$DiscordDomains = 'discord.com,discord.gg,discordapp.com,discordapp.net,discord.media,discordcdn.com,discord.dev,discord.new,discord.gift,discordstatus.com,dis.gd,discord.co,discord-attachments-uploads-prd.storage.googleapis.com'
 function ImagePath([string]$strategy) {
     "`"$Dest\winws.exe`" --wf-tcp=80,$TlsPorts" +
-    " --filter-tcp=80 --hostcase --new" +
-    " --filter-tcp=$TlsPorts $strategy"
+    " --filter-tcp=80 --hostcase --hostlist-domains=$DiscordDomains --new" +
+    " --filter-tcp=$TlsPorts $strategy --hostlist-domains=$DiscordDomains"
 }
 
 # --- download and verification -----------------------------------------------------------
