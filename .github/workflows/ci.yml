@@ -78,6 +78,11 @@ jobs:
           pgrep -a nfqws
           test -f /opt/zapret/.installed-by-dpi-dashboard
           sed -n '/^NFQWS_OPT=/,/^"/p' /opt/zapret/config
+      - name: Only Discord is touched
+        run: |
+          # Both profiles (http and tls) carry the Discord list; no empty <HOSTLIST> marker.
+          ! grep -q '<HOSTLIST' /opt/zapret/config
+          test "$(pgrep -a nfqws | grep -o -- '--hostlist-domains=discord.com,' | wc -l)" -ge 2
       - name: Status from the app's point of view
         run: |
           python -m dpi_dashboard.setup check | tee status.json
@@ -199,7 +204,10 @@ jobs:
           if ($s.Status -ne 'Running') { throw 'service is not running' }
           if ($s.StartType -ne 'Automatic') { throw 'service is not automatic' }
           Get-Process winws
-          (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\zapret).ImagePath
+          $img = (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\zapret).ImagePath
+          $img
+          # Only Discord is touched: both profiles (http and tls) carry the Discord list.
+          if (([regex]::Matches($img, '--hostlist-domains=discord\.com,')).Count -ne 2) { throw 'winws is not limited to Discord' }
           if (-not (Test-Path "$env:ProgramFiles\zapret\.installed-by-dpi-dashboard")) { throw 'marker missing' }
       - name: Log folder is locked (users read, cannot write)
         run: |
