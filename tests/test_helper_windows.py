@@ -130,4 +130,5 @@ def test_service_command_leaves_udp_alone(tmp_path):
     assert "udp" not in cmd                  # fakes broke Discord voice ("No Route")
     # Only Discord: without a host list every site's traffic was changed.
     assert cmd.count("--hostlist-domains=discord.com,") == 2
-    assert "--filter-tcp=443,2053,2083,2087,2096,8443 --dpi-desync=multisplit --hostlist-domains=" in cmd
+    assert ("--filter-tcp=443,2053,2083,2087,2096,8443 --dpi-desync=multisplit "
+            "--hostlist-domains=") in cmd

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.4
 
 - **zapret touches only Discord now; other sites open again.** The strategy was applied
   to every HTTPS connection: on Linux upstream's `<HOSTLIST>` marker expands to nothing
